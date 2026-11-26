@@ -85,8 +85,79 @@ public sealed class EntryRepository(JournalDatabase db, IClock clock)
             .ToList();
     }
 
-    /// <summary>Inserts an entry exactly as given (used by import); keeps uid and timestamps.</summary>
-    internal void InsertRaw(JournalEntry entry) => Insert(entry);
+    // ------------------------------------------------------------------ previous versions
+
+    private const string RevisionColumns =
+        "id, entry_id, summary, body, updated_utc, updated_offset, saved_utc, saved_offset, reason";
+
+    /// <summary>Previous versions of an entry, most recently replaced first.</summary>
+    public IReadOnlyList<EntryRevision> GetRevisions(long entryId) =>
+        db.Connection.Query<RevisionRow>(
+                $"SELECT {RevisionColumns} FROM entry_revisions WHERE entry_id = $entryId ORDER BY saved_utc DESC, id DESC",
+                new { entryId })
+            .Select(r => r.ToRevision()).ToList();
+
+    public EntryRevision? GetRevision(long id) =>
+        db.Connection.QuerySingleOrDefault<RevisionRow>(
+            $"SELECT {RevisionColumns} FROM entry_revisions WHERE id = $id", new { id })?.ToRevision();
+
+    public int RevisionCount(long entryId) =>
+        db.Connection.ExecuteScalar<int>("SELECT count(*) FROM entry_revisions WHERE entry_id = $entryId", new { entryId });
+
+    /// <summary>All previous versions of all entries, oldest first (used for export and merging).</summary>
+    public IReadOnlyList<EntryRevision> GetAllRevisions() =>
+        db.Connection.Query<RevisionRow>($"SELECT {RevisionColumns} FROM entry_revisions ORDER BY saved_utc, id")
+            .Select(r => r.ToRevision()).ToList();
+
+    /// <summary>
+    /// Keeps a previous version of an entry. Does nothing if an identical previous version
+    /// (same text and edit time) is already kept, so repeated merges don't pile up copies.
+    /// </summary>
+    /// <returns>True if a revision was added.</returns>
+    public bool AddRevision(long entryId, string summary, string body, DateTimeOffset updatedAt, DateTimeOffset savedAt,
+        string reason, Microsoft.Data.Sqlite.SqliteTransaction? transaction = null)
+    {
+        var exists = db.Connection.ExecuteScalar<bool>(
+            """
+            SELECT EXISTS (SELECT 1 FROM entry_revisions
+                           WHERE entry_id = $entryId AND summary = $summary AND body = $body AND updated_utc = $updatedUtc)
+            """,
+            new { entryId, summary, body, updatedUtc = DbTime.Utc(updatedAt) }, transaction);
+        if (exists) return false;
+
+        db.Connection.Execute(
+            """
+            INSERT INTO entry_revisions (entry_id, summary, body, updated_utc, updated_offset, saved_utc, saved_offset, reason)
+            VALUES ($entryId, $summary, $body, $updatedUtc, $updatedOffset, $savedUtc, $savedOffset, $reason)
+            """,
+            new
+            {
+                entryId, summary, body, reason,
+                updatedUtc = DbTime.Utc(updatedAt), updatedOffset = DbTime.Offset(updatedAt),
+                savedUtc = DbTime.Utc(savedAt), savedOffset = DbTime.Offset(savedAt),
+            },
+            transaction);
+        return true;
+    }
+
+    private sealed class RevisionRow
+    {
+        public long Id { get; set; }
+        public long EntryId { get; set; }
+        public string Summary { get; set; } = "";
+        public string Body { get; set; } = "";
+        public long UpdatedUtc { get; set; }
+        public long UpdatedOffset { get; set; }
+        public long SavedUtc { get; set; }
+        public long SavedOffset { get; set; }
+        public string Reason { get; set; } = "";
+
+        public EntryRevision ToRevision() => new(
+            Id, EntryId, Summary, Body,
+            DbTime.From(UpdatedUtc, UpdatedOffset),
+            DbTime.From(SavedUtc, SavedOffset),
+            Reason);
+    }
 
     private static object Params(JournalEntry e) => new
     {

@@ -90,6 +90,22 @@ internal static class Schema
             value   TEXT NOT NULL
         );
         """,
+
+        // ---- v2: previous versions of entries (kept when a merge or restore replaces text) ----
+        """
+        CREATE TABLE entry_revisions (
+            id              INTEGER PRIMARY KEY,
+            entry_id        INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+            summary         TEXT    NOT NULL,
+            body            TEXT    NOT NULL,
+            updated_utc     INTEGER NOT NULL,   -- when this text was last edited
+            updated_offset  INTEGER NOT NULL,
+            saved_utc       INTEGER NOT NULL,   -- when it became a previous version
+            saved_offset    INTEGER NOT NULL,
+            reason          TEXT    NOT NULL    -- 'merge' or 'restore'
+        );
+        CREATE INDEX ix_revisions_entry ON entry_revisions(entry_id);
+        """,
     ];
 
     public static int CurrentVersion => Migrations.Length;

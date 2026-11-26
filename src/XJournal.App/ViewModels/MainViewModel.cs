@@ -103,7 +103,50 @@ public sealed partial class MainViewModel : ViewModelBase
         SaveStatus = Session.Current.IsPersisted ? $"Last saved {Session.Current.UpdatedAt.LocalDateTime:g}" : "";
         UpdateWordCount();
         UpdateEntryStamp();
+        UpdateRevisions();
         EditorFocusRequested?.Invoke();
+    }
+
+    // ------------------------------------------------------------------ previous versions
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ShowRevisionsCommand))]
+    public partial int RevisionCount { get; set; }
+
+    public string RevisionsHeader => RevisionCount == 0 ? "Previous versions" : $"Previous versions ({RevisionCount})…";
+
+    partial void OnRevisionCountChanged(int value) => OnPropertyChanged(nameof(RevisionsHeader));
+
+    private void UpdateRevisions() =>
+        RevisionCount = Session.Current.IsPersisted ? Journal.Entries.RevisionCount(Session.Current.Id) : 0;
+
+    [RelayCommand(CanExecute = nameof(HasRevisions))]
+    private async Task ShowRevisionsAsync()
+    {
+        SaveNow();
+        var vm = new RevisionsViewModel(Journal.Entries.GetRevisions(Session.Current.Id));
+        var view = new Views.RevisionsView { DataContext = vm };
+        if (!await _dialogs.ShowContentAsync("Previous versions", view, "Restore", "Cancel", vm.Validate)) return;
+        try
+        {
+            Session.RestoreRevision(vm.Selected!.Revision.Id);
+        }
+        catch (JournalException ex)
+        {
+            await _dialogs.ShowMessageAsync("Couldn't restore", ex.Message);
+        }
+    }
+
+    private bool HasRevisions() => RevisionCount > 0;
+
+    /// <summary>Called after a merge changed the journal underneath the editor.</summary>
+    public void OnJournalMerged()
+    {
+        if (_closed) return;
+        Session.Reload();
+        UpdateRevisions();
+        RefreshQuestionState();
+        if (IsSearchOpen) Search.Run();
     }
 
     /// <summary>Asks the view to put the caret in the editor.</summary>
@@ -260,6 +303,8 @@ public sealed partial class MainViewModel : ViewModelBase
             var vm = new SettingsViewModel(Journal, new WindowDialogs(window));
             vm.QuestionsChanged += RefreshQuestionState;
             vm.SignOutRequested += () => SignOutCommand.Execute(null);
+            vm.MergeStarting += SaveNow;
+            vm.Merged += OnJournalMerged;
             window.DataContext = vm;
             return window;
         });

@@ -242,6 +242,85 @@ public sealed class UiTests : IDisposable
         main.Close();
     }
 
+    /// <summary>Shows a dialog's content in a plain window so it can be screenshotted.</summary>
+    private static Window Host(Control content, string title)
+    {
+        var window = new XJournal.App.Controls.JournalWindow { Width = 600, Height = 640 };
+        window.Content = new Border
+        {
+            Classes = { "card" }, Margin = new Avalonia.Thickness(24, 44, 24, 24), Padding = new Avalonia.Thickness(24),
+            Child = new StackPanel
+            {
+                Spacing = 16,
+                Children = { new TextBlock { Text = title, Classes = { "subtitle" } }, content },
+            },
+        };
+        window.Show();
+        Pump();
+        return window;
+    }
+
+    [AvaloniaFact]
+    public void Merging_another_computers_journal_updates_the_open_entry()
+    {
+        var home = _accounts.Create("caleb", Password);
+        var session = new XJournal.Core.Sessions.EntrySession(home);
+        session.SetText("Shared", "Written at home.");
+        session.Leave();
+        var (main, mainVm) = OpenMain(home); // resumes the recent entry
+        Assert.Equal("Written at home.", mainVm.Body);
+        Assert.False(mainVm.ShowRevisionsCommand.CanExecute(null));
+
+        // The laptop starts from a backup, then writes more.
+        var laptopAccounts = new AccountStore(Path.Combine(_root, "laptop"));
+        var start = Path.Combine(_root, "start.xjbackup");
+        XJournal.Core.Backup.JournalTransfer.ExportEncrypted(home, start);
+        using (var laptop = new XJournal.Core.Backup.JournalTransfer(laptopAccounts).ImportBackup(start, Password, "caleb", null, false))
+        {
+            Thread.Sleep(20);
+            var other = new XJournal.Core.Sessions.EntrySession(laptop);
+            other.Begin();
+            other.SetText("Shared", "Written at home. Finished on the laptop.");
+            other.StartNew();
+            other.SetText("Train", "Notes from the train.");
+            other.Leave();
+            XJournal.Core.Backup.JournalTransfer.ExportEncrypted(laptop, Path.Combine(_root, "laptop.xjbackup"));
+        }
+
+        var merge = new MergeJournalViewModel(home, Path.Combine(_root, "laptop.xjbackup"));
+        Assert.False(merge.Validate());
+        merge.BackupPassword = "wrong password";
+        merge.UnlockCommand.Execute(null);
+        Assert.NotNull(merge.Error);
+        merge.BackupPassword = Password;
+        Assert.True(merge.Validate());
+        Assert.Contains("1 new entry", merge.PreviewLines);
+        Assert.Contains(merge.PreviewLines, l => l.StartsWith("1 entry updated"));
+        var dialog = Host(new MergeJournalView { DataContext = merge }, "Merge in a journal");
+        Screenshot(dialog, "13-merge");
+        dialog.Close();
+
+        mainVm.SaveNow();
+        merge.Run();
+        mainVm.OnJournalMerged();
+        Assert.Equal("Written at home. Finished on the laptop.", mainVm.Body);
+        Assert.Equal(1, mainVm.RevisionCount);
+        Assert.True(mainVm.ShowRevisionsCommand.CanExecute(null));
+        Assert.Single(Directory.GetFiles(_accounts.SafetyBackupsDirectory, "*-before-merge-*.xjbackup"));
+
+        var revisions = new RevisionsViewModel(home.Entries.GetRevisions(mainVm.Session.Current.Id));
+        Assert.False(revisions.Validate());
+        revisions.Selected = revisions.Items[0];
+        var revisionsDialog = Host(new RevisionsView { DataContext = revisions }, "Previous versions");
+        Screenshot(revisionsDialog, "14-revisions");
+        revisionsDialog.Close();
+
+        mainVm.Session.RestoreRevision(revisions.Selected.Revision.Id);
+        Assert.Equal("Written at home.", mainVm.Body);
+        Assert.Equal(2, mainVm.RevisionCount); // the laptop text is kept too
+        main.Close();
+    }
+
     [AvaloniaFact]
     public void Dark_theme_renders()
     {

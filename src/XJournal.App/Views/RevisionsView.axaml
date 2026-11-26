@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:XJournal.App.ViewModels"
+             x:Class="XJournal.App.Views.RevisionsView"
+             x:DataType="vm:RevisionsViewModel"
+             Width="520">
+  <StackPanel Spacing="12">
+    <TextBlock Classes="secondary" TextWrapping="Wrap"
+               Text="Earlier text of this entry, kept when a merge or a restore replaced it. Restoring a version keeps the current text as a previous version too." />
+    <ListBox Classes="results" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" MaxHeight="360">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:RevisionItem">
+          <StackPanel Spacing="3">
+            <TextBlock Text="{Binding Edited}" FontWeight="SemiBold" />
+            <TextBlock Classes="caption" Text="{Binding Why}" />
+            <TextBlock Text="{Binding Summary}" IsVisible="{Binding HasSummary}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding Preview}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+    <TextBlock Classes="error" Text="{Binding Error}"
+               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </StackPanel>
+</UserControl>

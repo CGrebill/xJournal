@@ -13,6 +13,8 @@ Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](ht
 - **Trends.** A chart of each question over time (30 days, 90 days, a year, or all time). Hovering shows the exact wording that was answered, and clicking a point opens that day's entry.
 - **Encrypted.** Your password encrypts the whole journal file (see Security).
 - **Backup and moving computers.** You can export an encrypted backup or a readable JSON copy, then import either from the sign-in screen on another computer. Optional automatic backups go to any folder (e.g. a OneDrive, Dropbox or Google Drive folder) every time you sign out.
+- **Writing on more than one computer.** Merge a backup from another computer into your journal (see below).
+- **Previous versions.** When a merge replaces an entry's text, the old text is kept. You can restore it from the editor's **…** menu.
 
 ## Building and running
 
@@ -33,6 +35,24 @@ dotnet publish src/XJournal.App -c Release -r win-x64 --self-contained -p:Publis
 ```
 
 The UI tests run headlessly. Set `XJOURNAL_SCREENSHOTS=<folder>` to save a render of each screen.
+
+The app icon is drawn by [`tools/make_icon.py`](tools/make_icon.py), which needs Pillow. Run `python3 tools/make_icon.py` to regenerate `xjournal.ico` and `xjournal.png`.
+
+## Writing on more than one computer
+
+To keep one journal on two computers:
+
+1. On the laptop, open **Settings → Export encrypted backup…**.
+2. On the home computer, open **Settings → Merge in a journal…** and pick that file.
+3. To sync the other way, export from home and merge it on the laptop.
+
+How a merge treats your data:
+
+- **It only adds.** Nothing is ever deleted. An entry you deleted on one computer comes back if the other computer still has it.
+- **Entries are matched by an internal id**, so the same entry is never duplicated. If an entry was edited on both computers, the most recently edited text wins and the other text is kept as a *previous version*. Restore it any time from **… → Previous versions**.
+- **Check-in answers** are combined per day and per question. Where both computers answered the same question on the same day, the more recently saved answer wins.
+- **Questions** are matched by `id`, and their wordings by content, so every answer keeps the exact wording it was given for. The newest wording becomes the current one.
+- **A safety copy of your journal is saved first**, in the `replaced` folder (see below). The dialog shows exactly what will change before anything is written, and merging the same file twice does nothing.
 
 ## Check-in question files
 
@@ -64,7 +84,7 @@ Questions are plain JSON, so you can write them in any editor. Comments and trai
 | What | Location |
 | --- | --- |
 | Journals (one encrypted file per account) | `%APPDATA%\xJournal\users\<username>.xjdb` on Windows, `~/.config/xJournal/users/` on Linux and macOS |
-| Copies kept when an import replaces an account | `…\xJournal\replaced\` |
+| Copies kept when an import replaces an account, and safety copies taken before a merge | `…\xJournal\replaced\` |
 | Last username (not sensitive) | `…\xJournal\state.json` |
 
 Each journal is a single SQLite database. Entries, the search index, questions, answers and settings are all inside it.

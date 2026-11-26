@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Platform;
 
 namespace XJournal.App.Controls;
 
@@ -12,6 +13,9 @@ public class JournalWindow : Window
 {
     public const double TitleBarHeight = 36;
 
+    private static readonly Lazy<WindowIcon> AppIcon =
+        new(() => new WindowIcon(AssetLoader.Open(new Uri("avares://xJournal/Assets/xjournal.ico"))));
+
     protected override Type StyleKeyOverride => typeof(Window);
 
     public JournalWindow()
@@ -21,6 +25,7 @@ public class JournalWindow : Window
         ExtendClientAreaToDecorationsHint = true;
         ExtendClientAreaTitleBarHeightHint = TitleBarHeight;
         Classes.Add("journal");
+        Icon = AppIcon.Value;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

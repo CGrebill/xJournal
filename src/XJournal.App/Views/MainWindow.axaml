@@ -90,6 +90,8 @@
                   <Button.Flyout>
                     <MenuFlyout Placement="TopEdgeAlignedRight">
                       <MenuItem Header="New entry" InputGesture="Ctrl+N" Command="{Binding NewEntryCommand}" />
+                      <MenuItem Header="{Binding RevisionsHeader}" Command="{Binding ShowRevisionsCommand}" />
+                      <Separator />
                       <MenuItem Header="Delete this entry…" Command="{Binding DeleteEntryCommand}" />
                     </MenuFlyout>
                   </Button.Flyout>

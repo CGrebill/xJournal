@@ -39,6 +39,8 @@
         <TextBlock TextWrapping="Wrap"
                    Text="This account already exists on this computer. Replace it (a copy of the current journal is kept)." />
       </CheckBox>
+      <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding TargetExists}"
+                 Text="To combine this backup with the existing journal instead of replacing it, sign in and use Settings → Merge in a journal." />
     </StackPanel>
 
     <CheckBox IsChecked="{Binding UseNewPassword}" IsVisible="{Binding IsBackup}"

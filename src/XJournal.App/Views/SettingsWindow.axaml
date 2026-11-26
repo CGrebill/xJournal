@@ -115,6 +115,21 @@
             </StackPanel>
           </Grid>
         </Border>
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*">
+            <fa:FASymbolIcon Symbol="CloudSync" FontSize="18" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="10">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Merge in a journal from another computer" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Writing on two computers? Export a backup on one and merge it in here. Nothing is deleted; when an entry was edited in both places, the newest text wins and the other is kept as a previous version. To sync both ways, merge here, then export this journal and merge it on the other computer." />
+              </StackPanel>
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button Content="Merge in a journal…" Command="{Binding MergeJournalCommand}" />
+              </WrapPanel>
+            </StackPanel>
+          </Grid>
+        </Border>
 
         <!-- Security -->
         <TextBlock Classes="section" Text="Security" />

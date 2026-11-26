@@ -28,6 +28,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public event Action? QuestionsChanged;
     public event Action? SignOutRequested;
 
+    /// <summary>Raised before a merge writes to the journal (the editor should save first).</summary>
+    public event Action? MergeStarting;
+
+    /// <summary>Raised after a merge (the editor should reload what it shows).</summary>
+    public event Action? Merged;
+
     public string Username => _journal.Username;
     public string JournalLocation => _journal.Database.FilePath;
     public IReadOnlyList<string> Themes { get; } = ["Use system setting", "Light", "Dark"];
@@ -138,6 +144,32 @@ public sealed partial class SettingsViewModel : ViewModelBase
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JournalException)
         {
             await _dialogs.ShowMessageAsync("Couldn't save the backup", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task MergeJournalAsync()
+    {
+        var path = await _dialogs.PickOpenFileAsync("Merge in a journal", FileTypes.AnyJournal, FileTypes.Backup, FileTypes.JournalJson);
+        if (path is null) return;
+
+        var merge = new MergeJournalViewModel(_journal, path);
+        var view = new Views.MergeJournalView { DataContext = merge };
+        if (!await _dialogs.ShowContentAsync("Merge in a journal", view, "Merge", "Cancel", merge.Validate)) return;
+
+        try
+        {
+            MergeStarting?.Invoke();
+            var result = merge.Run();
+            Merged?.Invoke();
+            QuestionsChanged?.Invoke();
+            var lines = string.Join("\n", MergeJournalViewModel.Describe(result).Select(l => "• " + l));
+            await _dialogs.ShowMessageAsync("Journals merged", lines.Length > 0 ? lines : "Nothing needed to change.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JournalException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            await _dialogs.ShowMessageAsync("The merge didn't complete",
+                "Your journal wasn't changed.\n\n" + ex.Message);
         }
     }
 

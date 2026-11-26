@@ -25,6 +25,22 @@ public sealed class JournalEntry
     internal JournalEntry Clone() => (JournalEntry)MemberwiseClone();
 }
 
+/// <summary>
+/// A previous version of an entry's text, kept when a merge or a restore replaced it.
+/// </summary>
+public sealed record EntryRevision(
+    long Id,
+    long EntryId,
+    string Summary,
+    string Body,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset SavedAt,
+    string Reason)
+{
+    public const string MergeReason = "merge";
+    public const string RestoreReason = "restore";
+}
+
 /// <summary>Search filter. <see cref="From"/> and <see cref="To"/> are inclusive local days.</summary>
 public sealed record EntryQuery(string? Text = null, DateOnly? From = null, DateOnly? To = null, int Limit = 500);
 

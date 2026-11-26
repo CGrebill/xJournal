@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:XJournal.App.ViewModels"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             x:Class="XJournal.App.Views.MergeJournalView"
+             x:DataType="vm:MergeJournalViewModel"
+             Width="460">
+  <StackPanel Spacing="14">
+    <TextBlock Classes="secondary" TextWrapping="Wrap"
+               Text="Combine a journal from another computer with this one. Merging only adds: nothing is deleted, and when an entry was edited in both places the newest text wins while the other is kept as a previous version." />
+
+    <StackPanel Spacing="2">
+      <TextBlock Classes="caption" Text="File" />
+      <TextBlock Classes="body-strong" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+    </StackPanel>
+
+    <StackPanel Spacing="6" IsVisible="{Binding IsBackup}">
+      <TextBlock Text="Backup password" />
+      <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding !IsUnlocked}">
+        <TextBox Text="{Binding BackupPassword}" PasswordChar="●" Classes="revealPasswordButton"
+                 PlaceholderText="The password the backup was made with" />
+        <Button Grid.Column="1" Margin="8,0,0,0" Content="Unlock" Command="{Binding UnlockCommand}" />
+      </Grid>
+    </StackPanel>
+
+    <Border Classes="layer" Padding="14,12" IsVisible="{Binding HasChanges}">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="body-strong" Text="This merge will add:" />
+        <ItemsControl ItemsSource="{Binding PreviewLines}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Grid ColumnDefinitions="Auto,*" Margin="0,2">
+                <fa:FASymbolIcon Symbol="Checkmark" FontSize="12" VerticalAlignment="Top" Margin="0,3,8,0"
+                                 Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Classes="caption" TextWrapping="Wrap"
+                   Text="A safety copy of your journal is saved first, so this can always be undone." />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="layer" Padding="14,12" IsVisible="{Binding NothingToMerge}">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <fa:FASymbolIcon Symbol="Checkmark" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+        <TextBlock Text="Everything in this file is already in your journal." TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <TextBlock Classes="error" Text="{Binding Error}"
+               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </StackPanel>
+</UserControl>

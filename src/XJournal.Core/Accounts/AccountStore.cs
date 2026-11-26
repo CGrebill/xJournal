@@ -83,7 +83,7 @@ public sealed class AccountStore
         if (FindAccount(username) is not null) throw new AccountException("An account with that name already exists.");
         var database = JournalDatabase.Create(PathFor(username), password);
         LastUsername = username;
-        return new Journal(username, database, Clock);
+        return new Journal(username, database, Clock, SafetyBackupsDirectory);
     }
 
     /// <exception cref="AccountException">No such account.</exception>
@@ -93,7 +93,7 @@ public sealed class AccountStore
         var name = FindAccount(username) ?? throw new AccountException("There's no account with that username.");
         var database = JournalDatabase.Open(PathFor(name), password);
         LastUsername = name;
-        return new Journal(name, database, Clock);
+        return new Journal(name, database, Clock, SafetyBackupsDirectory);
     }
 
     /// <summary>

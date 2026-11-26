@@ -109,6 +109,40 @@ public sealed class EntrySession
         CurrentChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Re-reads the current entry from the database (e.g. after a merge changed it).
+    /// Pending edits should be saved first.
+    /// </summary>
+    public void Reload()
+    {
+        if (!Current.IsPersisted) return;
+        Current = _journal.Entries.Get(Current.Id) ?? NewDraft();
+        IsDirty = false;
+        CurrentChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Brings back a previous version of the current entry. The text being replaced is itself kept
+    /// as a previous version, so restoring can always be undone.
+    /// </summary>
+    public void RestoreRevision(long revisionId)
+    {
+        Save();
+        var revision = _journal.Entries.GetRevision(revisionId);
+        if (revision is null || revision.EntryId != Current.Id)
+            throw new JournalException("That previous version belongs to a different entry.");
+
+        var now = _journal.Clock.LocalNow();
+        _journal.Entries.AddRevision(Current.Id, Current.Summary, Current.Body, Current.UpdatedAt, now,
+            EntryRevision.RestoreReason);
+        Current.Summary = revision.Summary;
+        Current.Body = revision.Body;
+        Current.UpdatedAt = now;
+        _journal.Entries.Update(Current);
+        IsDirty = false;
+        CurrentChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>Permanently deletes the current entry and starts a fresh one.</summary>
     public void DeleteCurrent()
     {

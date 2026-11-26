@@ -6,9 +6,10 @@ namespace XJournal.Core;
 /// <summary>A signed-in user's open journal and everything that operates on it.</summary>
 public sealed class Journal : IDisposable
 {
-    internal Journal(string username, JournalDatabase database, IClock clock)
+    internal Journal(string username, JournalDatabase database, IClock clock, string? safetyBackupsDirectory = null)
     {
         Username = username;
+        SafetyBackupsDirectory = safetyBackupsDirectory;
         Database = database;
         Clock = clock;
         Entries = new EntryRepository(database, clock);
@@ -26,6 +27,9 @@ public sealed class Journal : IDisposable
     public AnswerRepository Answers { get; }
     public SettingsRepository Settings { get; }
     public QuestionImporter QuestionImporter { get; }
+
+    /// <summary>Where automatic safety copies go before risky operations (e.g. merging), if known.</summary>
+    public string? SafetyBackupsDirectory { get; }
 
     public void Dispose() => Database.Dispose();
 }
