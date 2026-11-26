@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -536,6 +537,30 @@ public sealed class UiTests : IDisposable
             Assert.False(parts.HasFlag(Avalonia.Controls.Chrome.TitleBarDecorations.FullScreenButton));
             Assert.True(parts.HasFlag(Avalonia.Controls.Chrome.TitleBarDecorations.CloseButton));
         }
+    }
+
+    [AvaloniaFact]
+    public void Drawn_title_bar_hides_its_title_text()
+    {
+        // Asking for no title isn't enough: FluentAvalonia's title bar template ignores that flag, which
+        // left the title doubled on Windows in 1.0.1. Headless windows never draw a title bar, so build
+        // one the way Avalonia does on Windows (internal API) and check what the styled template shows.
+        var window = new MainWindow { Width = 800, Height = 500 };
+        window.Show();
+        var host = typeof(TopLevel).GetProperty("TopLevelHost", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        var update = host.GetType().GetMethod("UpdateDrawnDecorations", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var partsType = Nullable.GetUnderlyingType(update.GetParameters()[0].ParameterType)!;
+        update.Invoke(host, [Enum.Parse(partsType, "TitleBar"), WindowState.Normal, window.WindowDecorationsTheme]);
+        Dispatcher.UIThread.RunJobs();
+
+        var decorations = (Avalonia.Controls.Chrome.WindowDrawnDecorations)host.GetType()
+            .GetProperty("Decorations", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(host)!;
+        var overlay = Assert.IsAssignableFrom<Control>(decorations.Content?.Overlay);
+        // Nothing in the drawn title bar may show the window title; our own title text is drawn by the window.
+        var shownTitles = overlay.GetSelfAndVisualDescendants().OfType<TextBlock>()
+            .Where(t => t.IsEffectivelyVisible && !string.IsNullOrEmpty(t.Text)).Select(t => t.Text).ToList();
+        Assert.Empty(shownTitles);
+        window.Close();
     }
 
     [AvaloniaFact]

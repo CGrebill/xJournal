@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 (2026-11-26)
+
+**Fixed**
+- On Windows, the window title was still drawn twice in the top-left corner in 1.0.1 (now on top of xJournal's own title text).
+
 ## 1.0.1 (2026-11-26)
 
 **Fixed**
