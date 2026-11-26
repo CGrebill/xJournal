@@ -16,6 +16,7 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            CrashHandler.Install();
             Shell = new AppShell(desktop, new AccountStore());
             Shell.ShowLogin();
         }

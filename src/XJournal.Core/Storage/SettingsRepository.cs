@@ -8,6 +8,7 @@ public sealed class SettingsRepository(JournalDatabase db)
 {
     public static readonly TimeSpan DefaultResumeWindow = TimeSpan.FromMinutes(30);
     public const int DefaultAutoBackupKeep = 10;
+    public const int DefaultAutoLockMinutes = 15;
 
     public string? Get(string key) =>
         db.Connection.ExecuteScalar<string?>("SELECT value FROM settings WHERE key = $key", new { key });
@@ -47,6 +48,13 @@ public sealed class SettingsRepository(JournalDatabase db)
     {
         get => int.TryParse(Get("auto_backup_keep"), CultureInfo.InvariantCulture, out var n) && n > 0 ? n : DefaultAutoBackupKeep;
         set => Set("auto_backup_keep", Math.Max(1, value).ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Sign out automatically after this many minutes without any input; 0 turns it off.</summary>
+    public int AutoLockMinutes
+    {
+        get => int.TryParse(Get("auto_lock_minutes"), CultureInfo.InvariantCulture, out var m) && m >= 0 ? m : DefaultAutoLockMinutes;
+        set => Set("auto_lock_minutes", Math.Max(0, value).ToString(CultureInfo.InvariantCulture));
     }
 
     /// <summary>"system", "light" or "dark".</summary>

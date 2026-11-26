@@ -99,9 +99,18 @@ public sealed class AccountStore
         username = username.Trim();
         if (ValidateUsername(username) is { } error) throw new AccountException(error);
         if (FindAccount(username) is not null) throw new AccountException("An account with that name already exists.");
-        var database = JournalDatabase.Create(PathFor(username), password);
-        LastUsername = username;
-        return new Journal(username, database, Clock, SafetyBackupsDirectory);
+        var accountLock = AcquireLock(username);
+        try
+        {
+            var database = JournalDatabase.Create(PathFor(username), password);
+            LastUsername = username;
+            return new Journal(username, database, Clock, SafetyBackupsDirectory, accountLock);
+        }
+        catch
+        {
+            accountLock.Dispose();
+            throw;
+        }
     }
 
     /// <exception cref="AccountException">No such account.</exception>
@@ -109,9 +118,37 @@ public sealed class AccountStore
     public Journal SignIn(string username, string password)
     {
         var name = FindAccount(username) ?? throw new AccountException("There's no account with that username.");
-        var database = JournalDatabase.Open(PathFor(name), password);
-        LastUsername = name;
-        return new Journal(name, database, Clock, SafetyBackupsDirectory);
+        var accountLock = AcquireLock(name);
+        try
+        {
+            var database = JournalDatabase.Open(PathFor(name), password);
+            LastUsername = name;
+            return new Journal(name, database, Clock, SafetyBackupsDirectory, accountLock);
+        }
+        catch
+        {
+            accountLock.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Takes the account's lock file, so the same journal can't be open twice at once (two windows
+    /// autosaving over each other). Held until the journal is closed; also works across processes.
+    /// </summary>
+    /// <exception cref="AccountException">The journal is already open.</exception>
+    private FileStream AcquireLock(string username)
+    {
+        Directory.CreateDirectory(UsersDirectory);
+        try
+        {
+            return new FileStream(Path.Combine(UsersDirectory, username.ToLowerInvariant() + ".lock"),
+                FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, bufferSize: 1);
+        }
+        catch (IOException)
+        {
+            throw new AccountException("This journal is already open in another xJournal window.");
+        }
     }
 
     /// <summary>
@@ -122,10 +159,13 @@ public sealed class AccountStore
     internal string? Install(string preparedFile, string username, bool replaceExisting)
     {
         var existing = FindAccount(username);
+        if (existing is not null && !replaceExisting) throw new AccountException("An account with that name already exists.");
+
+        // Hold the account's lock throughout: never replace a journal that's open somewhere.
+        using var accountLock = AcquireLock(existing ?? username);
         string? safetyCopy = null;
         if (existing is not null)
         {
-            if (!replaceExisting) throw new AccountException("An account with that name already exists.");
             Directory.CreateDirectory(SafetyBackupsDirectory);
             safetyCopy = Path.Combine(SafetyBackupsDirectory,
                 $"{existing}-replaced-{Clock.LocalNow():yyyyMMdd-HHmmss}{BackupExtension}");

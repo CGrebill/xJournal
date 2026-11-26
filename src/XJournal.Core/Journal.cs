@@ -6,8 +6,12 @@ namespace XJournal.Core;
 /// <summary>A signed-in user's open journal and everything that operates on it.</summary>
 public sealed class Journal : IDisposable
 {
-    internal Journal(string username, JournalDatabase database, IClock clock, string? safetyBackupsDirectory = null)
+    private readonly IDisposable? _accountLock;
+
+    internal Journal(string username, JournalDatabase database, IClock clock, string? safetyBackupsDirectory = null,
+        IDisposable? accountLock = null)
     {
+        _accountLock = accountLock;
         Username = username;
         SafetyBackupsDirectory = safetyBackupsDirectory;
         Database = database;
@@ -38,5 +42,6 @@ public sealed class Journal : IDisposable
     {
         IsDisposed = true;
         Database.Dispose();
+        _accountLock?.Dispose();
     }
 }

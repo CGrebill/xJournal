@@ -18,8 +18,16 @@ public class JournalWindow : Window
 
     protected override Type StyleKeyOverride => typeof(Window);
 
+    /// <summary>Raised on any keyboard or pointer input in any xJournal window (used for auto-lock).</summary>
+    public static event Action? Activity;
+
     public JournalWindow()
     {
+        AddHandler(KeyDownEvent, (_, _) => Activity?.Invoke(), Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerPressedEvent, (_, _) => Activity?.Invoke(), Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerMovedEvent, (_, _) => Activity?.Invoke(), Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerWheelChangedEvent, (_, _) => Activity?.Invoke(), Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+
         Background = Brushes.Transparent;
         TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.None];
         ExtendClientAreaToDecorationsHint = true;

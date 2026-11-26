@@ -20,6 +20,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         var settings = journal.Settings;
         ThemeIndex = settings.Theme switch { "light" => 1, "dark" => 2, _ => 0 };
         ResumeMinutes = (decimal)settings.ResumeWindow.TotalMinutes;
+        AutoLockMinutes = settings.AutoLockMinutes;
         AutoBackupFolder = settings.AutoBackupFolder;
         AutoBackupKeep = settings.AutoBackupKeep;
         _loading = false;
@@ -42,6 +43,14 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty] public partial int ThemeIndex { get; set; }
     [ObservableProperty] public partial decimal? ResumeMinutes { get; set; }
+
+    [ObservableProperty] public partial decimal? AutoLockMinutes { get; set; }
+
+    partial void OnAutoLockMinutesChanged(decimal? value)
+    {
+        if (_loading || value is null) return;
+        _journal.Settings.AutoLockMinutes = (int)Math.Clamp(value.Value, 0, 24 * 60);
+    }
 
     partial void OnThemeIndexChanged(int value)
     {

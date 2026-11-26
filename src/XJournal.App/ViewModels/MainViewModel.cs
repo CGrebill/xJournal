@@ -21,6 +21,8 @@ public sealed partial class MainViewModel : ViewModelBase
     private readonly Window _owner;
     private readonly DispatcherTimer _autosave;
     private readonly DispatcherTimer _clock;
+    private readonly DispatcherTimer _idleCheck;
+    private DateTimeOffset _lastActivity;
     private bool _loadingEntry;
     private bool _closed;
     private Window? _questionsWindow, _trendsWindow, _settingsWindow;
@@ -38,6 +40,12 @@ public sealed partial class MainViewModel : ViewModelBase
         _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _clock.Tick += (_, _) => UpdateClock();
         _clock.Start();
+
+        _lastActivity = journal.Clock.Now;
+        Controls.JournalWindow.Activity += ReportActivity;
+        _idleCheck = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _idleCheck.Tick += (_, _) => CheckIdle(Journal.Clock.Now);
+        _idleCheck.Start();
 
         Session.CurrentChanged += (_, _) => LoadCurrentEntry();
         Session.Begin();
@@ -90,6 +98,7 @@ public sealed partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            AppLog.Write(ex, "autosave");
             SaveStatus = "Couldn't save: " + ex.Message;
         }
     }
@@ -337,13 +346,31 @@ public sealed partial class MainViewModel : ViewModelBase
         window.Show(_owner);
     }
 
+    // ------------------------------------------------------------------ auto-lock
+
+    /// <summary>Records user input (any key or pointer activity in any xJournal window).</summary>
+    public void ReportActivity() => _lastActivity = Journal.Clock.Now;
+
+    /// <summary>Signs out if there's been no input for the auto-lock time.</summary>
+    /// <returns>True if it signed out.</returns>
+    public bool CheckIdle(DateTimeOffset now)
+    {
+        if (_closed) return false;
+        var minutes = Journal.Settings.AutoLockMinutes;
+        if (minutes <= 0 || now - _lastActivity < TimeSpan.FromMinutes(minutes)) return false;
+        SignOut($"You were signed out after {minutes} minute{(minutes == 1 ? "" : "s")} without activity. Everything was saved.");
+        return true;
+    }
+
     // ------------------------------------------------------------------ closing
 
     [RelayCommand]
-    private void SignOut()
+    private void SignOut() => SignOut(null);
+
+    private void SignOut(string? reason)
     {
         var notice = Close();
-        SignedOut?.Invoke(notice);
+        SignedOut?.Invoke(notice ?? reason);
     }
 
     /// <summary>
@@ -355,6 +382,8 @@ public sealed partial class MainViewModel : ViewModelBase
         if (_closed) return null;
         _autosave.Stop();
         _clock.Stop();
+        _idleCheck.Stop();
+        Controls.JournalWindow.Activity -= ReportActivity;
         Search.Stop();
         string? notice = null;
         try
@@ -363,6 +392,7 @@ public sealed partial class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            AppLog.Write(ex, "save on close");
             notice = "Your last changes couldn't be saved: " + ex.Message;
         }
 

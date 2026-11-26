@@ -1,5 +1,7 @@
 # xJournal
 
+[![CI](https://github.com/CGrebill/xJournal/actions/workflows/ci.yml/badge.svg)](https://github.com/CGrebill/xJournal/actions/workflows/ci.yml)
+
 A private desktop journal that runs itself. Sign in and start typing. Entries are created, timestamped and saved automatically, and you can find any of them later by date or by what you wrote. Daily 1–5 check-in questions track how things change over time.
 
 Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](https://github.com/amwx/FluentAvalonia), so it has a Windows 11 (WinUI-style) look with Mica, and it runs on Windows, macOS and Linux.
@@ -12,6 +14,9 @@ Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](ht
 - **Check-in questions.** You import your own 1–5 scale questions from a JSON file (format below) and answer them in a separate window, once per day. Answers save as you click, and each day's answers are linked to the entry you were writing. A gentle reminder appears if you haven't answered yet today.
 - **Trends.** A chart of each question over time (30 days, 90 days, a year, or all time). Hovering shows the exact wording that was answered, and clicking a point opens that day's entry.
 - **Encrypted.** Your password encrypts the whole journal file (see Security).
+- **Locks itself.** After 15 minutes without typing or mouse activity, xJournal saves and signs out. You can change the time, or turn it off, in Settings.
+- **One window per journal.** The same account can't be open twice at once, even in two copies of the app, so two windows can't save over each other.
+- **Fails gracefully.** If something unexpected goes wrong you get a message, not a vanished window. Technical details go to a local log, which never contains journal text.
 - **Backup and moving computers.** You can export an encrypted backup or a readable JSON copy, then import either from the sign-in screen on another computer. Optional automatic backups go to any folder (e.g. a OneDrive, Dropbox or Google Drive folder) every time you sign out.
 - **Writing on more than one computer.** Merge a backup from another computer into your journal (see below).
 - **Previous versions.** When a merge replaces an entry's text, the old text is kept. You can restore it from the editor's **…** menu.
@@ -44,7 +49,7 @@ To publish a self-contained Windows build:
 dotnet publish src/XJournal.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
-The UI tests run headlessly. Set `XJOURNAL_SCREENSHOTS=<folder>` to save a render of each screen.
+CI builds with warnings treated as errors and runs every test on Windows and Linux for each push (`.github/workflows/ci.yml`). The UI tests run headlessly. Set `XJOURNAL_SCREENSHOTS=<folder>` to save a render of each screen.
 
 The app icon is drawn by [`tools/make_icon.py`](tools/make_icon.py), which needs Pillow. Run `python3 tools/make_icon.py` to regenerate `xjournal.ico` and `xjournal.png`.
 
@@ -96,6 +101,8 @@ Questions are plain JSON, so you can write them in any editor. Comments and trai
 | Journals (one encrypted file per account) | `%APPDATA%\xJournal\users\<username>.xjdb` on Windows, `~/.config/xJournal/users/` on Linux and macOS |
 | Copies kept when an import replaces an account, and safety copies taken before a merge | `…\xJournal\replaced\` |
 | Last username (not sensitive) | `…\xJournal\state.json` |
+| Error log (technical details only; newest 10 days kept) | `…\xJournal\logs\` |
+| Lock file while a journal is open (empty) | `…\xJournal\users\<username>.lock` |
 
 Each journal is a single SQLite database. Entries, the search index, questions, answers and settings are all inside it.
 

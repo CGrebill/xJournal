@@ -156,6 +156,19 @@
           </Grid>
         </Border>
 
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <fa:FASymbolIcon Symbol="Clock" FontSize="18" />
+            <StackPanel Grid.Column="1" Margin="14,0" Spacing="1">
+              <TextBlock Text="Lock when idle" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="Sign out automatically after this many minutes without any typing or mouse activity. Everything is saved first. 0 turns it off." />
+            </StackPanel>
+            <NumericUpDown Grid.Column="2" Width="130" VerticalAlignment="Center" Minimum="0" Maximum="1440"
+                           Increment="5" FormatString="0" Value="{Binding AutoLockMinutes}" />
+          </Grid>
+        </Border>
+
         <!-- Account -->
         <TextBlock Classes="section" Text="Account" />
         <Border Classes="card setting">

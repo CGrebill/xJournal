@@ -97,3 +97,47 @@ public class AccountMaintenanceTests
         Assert.True(journal.IsDisposed);
     }
 }
+
+public class AccountLockTests
+{
+    [Fact]
+    public void The_same_journal_cannot_be_open_twice()
+    {
+        using var env = new TestEnv();
+        var first = env.CreateJournal();
+        var ex = Assert.Throws<AccountException>(() => env.Accounts.SignIn("caleb", TestEnv.Password));
+        Assert.Contains("already open", ex.Message);
+
+        // A second app instance (another AccountStore on the same folder) is refused too.
+        var otherInstance = new Accounts.AccountStore(env.Root, env.Clock);
+        Assert.Throws<AccountException>(() => otherInstance.SignIn("CALEB", TestEnv.Password));
+
+        first.Dispose();
+        using var again = otherInstance.SignIn("caleb", TestEnv.Password);
+    }
+
+    [Fact]
+    public void A_wrong_password_does_not_leave_the_journal_locked()
+    {
+        using var env = new TestEnv();
+        env.CreateJournal().Dispose();
+        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("caleb", "wrong password"));
+        using var journal = env.Accounts.SignIn("caleb", TestEnv.Password);
+    }
+
+    [Fact]
+    public void An_open_journal_cannot_be_replaced_by_an_import()
+    {
+        using var env = new TestEnv();
+        string backup;
+        using (var source = env.CreateJournal("source"))
+        {
+            backup = env.TempFile("b.xjbackup");
+            Backup.JournalTransfer.ExportEncrypted(source, backup);
+        }
+        using var open = env.CreateJournal("caleb");
+        Assert.Throws<AccountException>(() =>
+            new Backup.JournalTransfer(env.Accounts).ImportBackup(backup, TestEnv.Password, "caleb", null, replaceExisting: true));
+        Assert.Empty(Directory.EnumerateFiles(env.Accounts.UsersDirectory, ".import-*"));
+    }
+}

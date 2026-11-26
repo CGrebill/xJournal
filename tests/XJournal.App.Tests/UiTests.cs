@@ -179,6 +179,56 @@ public sealed class UiTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void Idle_journal_signs_out_after_the_auto_lock_time()
+    {
+        var journal = _accounts.Create("caleb", Password);
+        Assert.Equal(15, journal.Settings.AutoLockMinutes);
+        var (window, vm) = OpenMain(journal);
+        string? notice = null;
+        vm.SignedOut += n => notice = n;
+        vm.Body = "Unsaved when the lock kicks in.";
+
+        var now = DateTimeOffset.Now;
+        Assert.False(vm.CheckIdle(now.AddMinutes(14)));
+        vm.ReportActivity();
+        Assert.False(vm.CheckIdle(DateTimeOffset.Now.AddMinutes(10)));
+        Assert.True(vm.CheckIdle(DateTimeOffset.Now.AddMinutes(16)));
+
+        Assert.Contains("15 minutes", notice);
+        Assert.True(journal.IsDisposed);
+        using (var reopened = _accounts.SignIn("caleb", Password))
+        {
+            Assert.Equal("Unsaved when the lock kicks in.", reopened.Entries.GetLatest()!.Body);
+            reopened.Settings.AutoLockMinutes = 0;
+        }
+
+        var again = _accounts.SignIn("caleb", Password);
+        var (window2, vm2) = OpenMain(again);
+        Assert.False(vm2.CheckIdle(DateTimeOffset.Now.AddDays(1))); // 0 = never
+        window2.Close();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Unexpected_errors_are_logged()
+    {
+        var previous = AppLog.Folder;
+        AppLog.Folder = Path.Combine(_root, "logs");
+        try
+        {
+            CrashHandler.Handle(new InvalidOperationException("Something broke"));
+            var log = Assert.Single(Directory.GetFiles(AppLog.Folder, "xjournal-*.log"));
+            var text = File.ReadAllText(log);
+            Assert.Contains("InvalidOperationException: Something broke", text);
+            Assert.Contains("[ui]", text);
+        }
+        finally
+        {
+            AppLog.Folder = previous;
+        }
+    }
+
+    [AvaloniaFact]
     public void Questions_window_saves_answers_and_clears_the_reminder()
     {
         var journal = _accounts.Create("caleb", Password);

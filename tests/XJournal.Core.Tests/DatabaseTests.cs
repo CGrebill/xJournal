@@ -74,7 +74,7 @@ public class DatabaseTests
         using var env = new TestEnv();
         const string password = "pä'ss\"wörd 🔒;--";
         env.Accounts.Create("caleb", password).Dispose();
-        using var journal = env.Accounts.SignIn("caleb", password);
+        env.Accounts.SignIn("caleb", password).Dispose();
         Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("caleb", "pä'ss\"wörd"));
     }
 
