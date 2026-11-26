@@ -12,10 +12,10 @@ public enum QuestionChange
     /// <summary>A question id not seen before.</summary>
     Added,
 
-    /// <summary>Same wording and scale as the current version.</summary>
+    /// <summary>Same wording and settings as the current version.</summary>
     Unchanged,
 
-    /// <summary>Wording or scale differs: a new version will be added; old answers keep the old wording.</summary>
+    /// <summary>Wording or settings differ: a new version will be added; old answers keep the old wording.</summary>
     Changed,
 }
 
@@ -32,6 +32,9 @@ public sealed record QuestionImportPlan(
     IReadOnlyList<Question> ToArchive,
     bool ReplacesSet)
 {
+    /// <summary>Problems that stop the import (e.g. a question changing type); empty if it can go ahead.</summary>
+    public IReadOnlyList<string> Errors { get; init; } = [];
+
     public int AddedCount => Questions.Count(q => q.Change == QuestionChange.Added);
     public int ChangedCount => Questions.Count(q => q.Change == QuestionChange.Changed);
     public int UnchangedCount => Questions.Count(q => q.Change == QuestionChange.Unchanged);
@@ -53,6 +56,7 @@ public sealed class QuestionImporter(JournalDatabase db, QuestionRepository ques
     {
         var existing = questions.GetAll(includeArchived: true).ToDictionary(q => q.Id, StringComparer.Ordinal);
         var planned = new List<PlannedQuestion>();
+        var errors = new List<string>();
         var orderChanged = false;
         for (var i = 0; i < incoming.Count; i++)
         {
@@ -63,7 +67,14 @@ public sealed class QuestionImporter(JournalDatabase db, QuestionRepository ques
                 continue;
             }
 
-            var change = ContentHash(question.Text, question.Scale) == current.Current.ContentHash
+            if (current.Current.Type != question.Type)
+            {
+                errors.Add($"\"{question.Id}\" is a {current.Current.Type.ToKey()} question, but the file makes it a " +
+                           $"{question.Type.ToKey()} question. A question can't change type: give it a new id " +
+                           "(the old question keeps its answers).");
+            }
+
+            var change = ContentHash(question.Text, question.Type, question.Config) == current.Current.ContentHash
                 ? QuestionChange.Unchanged
                 : QuestionChange.Changed;
             orderChanged |= current.SortOrder != i;
@@ -75,7 +86,11 @@ public sealed class QuestionImporter(JournalDatabase db, QuestionRepository ques
             ? existing.Values.Where(q => !q.Archived && !incomingIds.Contains(q.Id)).OrderBy(q => q.SortOrder).ToList()
             : [];
 
-        return new QuestionImportPlan(planned, toArchive, archiveMissing) { OrderChanged = archiveMissing && orderChanged };
+        return new QuestionImportPlan(planned, toArchive, archiveMissing)
+        {
+            OrderChanged = archiveMissing && orderChanged,
+            Errors = errors,
+        };
     }
 
     /// <summary>
@@ -84,6 +99,8 @@ public sealed class QuestionImporter(JournalDatabase db, QuestionRepository ques
     /// </summary>
     public void Apply(QuestionImportPlan plan)
     {
+        if (plan.Errors.Count > 0) throw new JournalException(plan.Errors[0]);
+
         var connection = db.Connection;
         var now = clock.LocalNow();
         using var transaction = connection.BeginTransaction();
@@ -109,7 +126,7 @@ public sealed class QuestionImporter(JournalDatabase db, QuestionRepository ques
 
             var versionId = item.Change == QuestionChange.Unchanged
                 ? item.Previous!.Id
-                : GetOrAddVersion(q.Id, q.Text, q.Scale, now, transaction);
+                : GetOrAddVersion(q.Id, q.Text, q.Type, q.Config, now, transaction);
 
             connection.Execute(
                 "UPDATE questions SET current_version_id = $versionId, archived = 0 WHERE id = $id",
@@ -125,51 +142,72 @@ public sealed class QuestionImporter(JournalDatabase db, QuestionRepository ques
     }
 
     /// <summary>Exports the active questions in the import format, so they can be edited and re-imported.</summary>
-    public QuestionFile Export()
+    public QuestionFile Export() => new()
     {
-        var active = questions.GetAll();
-        return new QuestionFile
+        Questions = questions.GetAll().Select(q => ToFileItem(q.Id, q.Current)).ToList(),
+    };
+
+    internal static QuestionFileItem ToFileItem(string id, QuestionVersion v)
+    {
+        var c = v.Config;
+        return new QuestionFileItem
         {
-            Scale = [.. QuestionFile.DefaultScale],
-            Questions = active.Select(q => new QuestionFileItem
-            {
-                Id = q.Id,
-                Text = q.Current.Text,
-                Scale = q.Current.Scale.SequenceEqual(QuestionFile.DefaultScale) ? null : [.. q.Current.Scale],
-            }).ToList(),
+            Id = id,
+            Type = v.Type.ToKey(),
+            Text = v.Text,
+            Labels = v.Type == QuestionType.Rating && !v.Labels.SequenceEqual(QuestionFile.DefaultLabels) ? [.. v.Labels] : null,
+            Min = v.Type == QuestionType.Scale && c.Min != 1 ? c.Min : null,
+            Max = v.Type == QuestionType.Scale && c.Max != 10 ? c.Max : null,
+            Low = c.Low,
+            High = c.High,
+            Options = c.Options is null ? null : [.. c.Options],
+            Multiple = c.Multiple,
+            Unit = c.Unit,
         };
     }
 
     /// <summary>Reuses an identical earlier version (e.g. wording reverted) or adds a new one.</summary>
-    internal long GetOrAddVersion(string questionId, string text, IReadOnlyList<string> scale, DateTimeOffset createdAt,
-        Microsoft.Data.Sqlite.SqliteTransaction transaction)
+    internal long GetOrAddVersion(string questionId, string text, QuestionType type, QuestionConfig config,
+        DateTimeOffset createdAt, Microsoft.Data.Sqlite.SqliteTransaction transaction)
     {
-        var hash = ContentHash(text, scale);
+        var hash = ContentHash(text, type, config);
         var existing = db.Connection.ExecuteScalar<long?>(
             "SELECT id FROM question_versions WHERE question_id = $questionId AND content_hash = $hash",
             new { questionId, hash }, transaction);
         if (existing is { } id) return id;
 
-        return db.Connection.ExecuteScalar<long>(
+        return InsertVersion(db.Connection, questionId, text, type, config, createdAt, transaction);
+    }
+
+    /// <summary>Adds a question version row (no reuse check).</summary>
+    internal static long InsertVersion(Microsoft.Data.Sqlite.SqliteConnection connection, string questionId, string text,
+        QuestionType type, QuestionConfig config, DateTimeOffset createdAt, Microsoft.Data.Sqlite.SqliteTransaction transaction) =>
+        connection.ExecuteScalar<long>(
             """
-            INSERT INTO question_versions (question_id, text, scale_json, content_hash, created_utc, created_offset)
-            VALUES ($questionId, $text, $scaleJson, $hash, $utc, $offset)
+            INSERT INTO question_versions (question_id, text, type, config_json, scale_json, content_hash, created_utc, created_offset)
+            VALUES ($questionId, $text, $type, $configJson, $scaleJson, $hash, $utc, $offset)
             RETURNING id
             """,
             new
             {
-                questionId, text, hash,
-                scaleJson = JsonSerializer.Serialize(scale),
+                questionId, text,
+                type = type.ToKey(),
+                configJson = config.ToJson(),
+                scaleJson = JsonSerializer.Serialize(config.Labels ?? []),
+                hash = ContentHash(text, type, config),
                 utc = DbTime.Utc(createdAt),
                 offset = DbTime.Offset(createdAt),
             },
             transaction);
-    }
 
-    /// <summary>Identifies a wording + scale combination.</summary>
-    public static string ContentHash(string text, IReadOnlyList<string> scale)
+    /// <summary>Identifies a wording + type + settings combination.</summary>
+    public static string ContentHash(string text, QuestionType type, QuestionConfig config)
     {
-        var canonical = JsonSerializer.Serialize(new object[] { QuestionFileParser.NormalizeText(text), scale.Select(s => QuestionFileParser.NormalizeText(s)).ToArray() });
+        var normalized = QuestionFileParser.NormalizeText(text);
+        // Ratings keep the original (text + labels) form, so versions saved before question types still match.
+        var canonical = type == QuestionType.Rating
+            ? JsonSerializer.Serialize(new object[] { normalized, (config.Labels ?? []).Select(s => QuestionFileParser.NormalizeText(s)).ToArray() })
+            : JsonSerializer.Serialize(new object[] { normalized, type.ToKey(), config.ToJson() });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 }

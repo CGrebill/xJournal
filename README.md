@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/CGrebill/xJournal/actions/workflows/ci.yml/badge.svg)](https://github.com/CGrebill/xJournal/actions/workflows/ci.yml)
 
-A private desktop journal that runs itself. Sign in and start typing. Entries are created, timestamped and saved automatically, and you can find any of them later by date or by what you wrote. Daily 1–5 check-in questions track how things change over time.
+A private desktop journal that runs itself. Sign in and start typing. Entries are created, timestamped and saved automatically, and you can find any of them later by date or by what you wrote. Daily check-in questions (scales, yes/no, multiple choice, numbers or a short sentence) track how things change over time.
 
 Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](https://github.com/amwx/FluentAvalonia), so it has a Windows 11 (WinUI-style) look with Mica, and it runs on Windows, macOS and Linux.
 
@@ -10,7 +10,7 @@ Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](ht
 
 | | |
 | --- | --- |
-| ![Today's check-in: five 1–5 questions answered as pill buttons](docs/screenshots/check-in.png) | ![Trends: a line chart of one question's answers, with a marker where the question was reworded](docs/screenshots/trends.png) |
+| ![Today's check-in: a 1–10 scale, an agree/disagree rating, yes/no, multiple choice, a number and a short sentence](docs/screenshots/check-in.png) | ![Trends: a line chart of one question's answers, with a marker where the question was reworded](docs/screenshots/trends.png) |
 | **Daily check-in** with your own questions | **Trends** for every question |
 | ![Calendar: a month grid with dots on days with entries and check marks on check-in days](docs/screenshots/calendar.png) | ![Writing stats: streak, weekly and monthly totals, and a words-per-week bar chart](docs/screenshots/writing-stats.png) |
 | **Calendar** of your writing and check-ins | **Writing stats** and streaks |
@@ -39,11 +39,11 @@ Your journals are stored separately from the app (see [Where your data lives](#w
 - **Automatic entries.** Signing in reopens your last entry if you edited it in the last 30 minutes (configurable). Otherwise a new entry starts. An entry is stamped with the exact moment you start writing (date, time to the millisecond, and your UTC offset). It's saved 1.5 s after you stop typing, and also when you switch entries, leave the window, sign out or close the app. Empty entries are never saved.
 - **Summary line.** An optional one-line tagline per entry. It's searchable.
 - **Search.** Full-text search across all entries. Words match as prefixes, and `"quoted phrases"` match exactly. Matches are highlighted. You can filter by date (today, past 7/30 days, past year, or a custom range).
-- **Check-in questions.** You import your own 1–5 scale questions from a JSON file (format below) and answer them in a separate window, once per day. Answers save as you click, and each day's answers are linked to the entry you were writing. A gentle reminder appears if you haven't answered yet today.
+- **Check-in questions.** You import your own questions from a JSON file (format below) and answer them in a separate window, once per day: 1–10 scales, labeled ratings, yes/no, multiple choice with your own options, numbers, or a short sentence. Answers save as you go, and each day's answers are linked to the entry you were writing. A gentle reminder appears if you haven't answered yet today.
 - **Calendar.** A month view showing the days you wrote (the dot grows with the number of entries) and the days you checked in. Click a day to see its entries, then open one.
 - **On this day.** On a fresh entry, a small card shows what you wrote on this date last month or in earlier years. Hide it for the day with ×.
 - **Writing stats & streaks.** Trends → *Your writing* shows your current and longest streak, entries and words this week, this month and all time, and a chart of words per week. A streak of 2+ days also appears next to the clock.
-- **Trends.** A chart of each question over time (30 days, 90 days, a year, or all time). Hovering shows the exact wording that was answered, and clicking a point opens that day's entry.
+- **Trends.** Each question over time (30 days, 90 days, a year, or all time), shown in the way that fits its type: a line chart, how often each answer was given, or a list of past answers. Hovering a point shows the exact wording that was answered, and clicking it opens that day's entry.
 - **Encrypted.** Your password encrypts the whole journal file (see Security).
 - **Locks itself.** After 15 minutes without typing or mouse activity, xJournal saves and signs out. You can change the time, or turn it off, in Settings.
 - **One window per journal.** The same account can't be open twice at once, even in two copies of the app, so two windows can't save over each other.
@@ -110,21 +110,33 @@ Questions are plain JSON, so you can write them in any editor. Comments and trai
 
 ```jsonc
 {
-  "version": 1,
-  // Labels for 1..5, lowest first. Optional; this is the default.
-  "scale": ["Entirely disagree", "Somewhat disagree", "Neither agree nor disagree",
-            "Somewhat agree", "Entirely agree"],
+  "version": 2,
   "questions": [
-    { "id": "energy", "text": "I had plenty of energy today." },
-    { "id": "stress", "text": "How stressed did I feel?",
-      "scale": ["Not at all", "A little", "Moderately", "Very", "Extremely"] }
+    { "id": "day", "type": "scale", "text": "How was today overall?", "low": "Awful", "high": "Great" },
+    { "id": "mood", "type": "rating", "text": "My mood was generally good." },
+    { "id": "exercise", "type": "yesno", "text": "Did I exercise today?" },
+    { "id": "did", "type": "choice", "text": "What did I spend time on?",
+      "options": ["Work", "Exercise", "Friends", "Rest"], "multiple": true },
+    { "id": "sleep", "type": "number", "text": "How many hours did I sleep?", "unit": "hours" },
+    { "id": "good", "type": "text", "text": "One good thing about today" }
   ]
 }
 ```
 
+Every question has a `type`:
+
+| `type` | Answered with | Settings | Trends |
+|---|---|---|---|
+| `scale` | numbered buttons | `min`/`max` (default 1–10, within 0–10); `low`/`high` words for the ends | line chart |
+| `rating` | labeled buttons | `labels`: 2–7, lowest first (default: *Entirely disagree* … *Entirely agree*) | line chart |
+| `yesno` | Yes / No | | share of "yes" per week or month, current streak |
+| `choice` | your own options | `options`: 2–20; `"multiple": true` to allow several | how often each option was picked |
+| `number` | a number (decimals allowed) | `unit`, e.g. `"hours"` | line chart |
+| `text` | a short sentence (up to 200 characters) | | a list of past answers |
+
 **Your answers can't be lost by re-importing:**
 
-- A question is identified by its `id`. Keep the id the same and you can change the text or scale freely. The change becomes a new *version*, and earlier answers stay attached to the exact wording they were given for. Trends show where the wording changed.
+- A question is identified by its `id`. Keep the id the same and you can change the text or its settings (labels, options, …) freely. The change becomes a new *version*, and earlier answers stay attached to the exact wording they were given for. Trends show where the wording changed. A question can't change its `type`; give it a new id instead.
 - Question versions can never be edited or deleted. This is enforced inside the database itself, not just by the app.
 - When an import replaces your question set (the default), a question you leave out of the file is **archived**, not deleted. It disappears from the check-in, but its answers and trends remain. Put it back in a file and it returns. You can also import in "add only" mode, which archives nothing.
 - Before anything is saved, the importer shows exactly what will be added, reworded and archived.

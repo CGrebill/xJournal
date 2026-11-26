@@ -112,11 +112,11 @@ public class InsightTests
     {
         using var env = new TestEnv();
         using var journal = env.CreateJournal();
-        var parsed = QuestionFileParser.Parse("""{"questions":[{"id":"mood","text":"Good | mood"}]}""");
+        var parsed = QuestionFileParser.Parse("""{"questions":[{"id":"mood","type":"rating","text":"Good | mood"}]}""");
         journal.QuestionImporter.Apply(journal.QuestionImporter.Plan(parsed.Questions));
         var entry = WriteAt(env, journal, Local(2026, 11, 24, 14, 31), "Line one\nline two\n\nNew paragraph", "A title");
         journal.Answers.SaveForDay(new DateOnly(2026, 11, 24), entry.Id,
-            new Dictionary<long, int> { [journal.Questions.Get("mood")!.Current.Id] = 4 }, env.Clock.Now);
+            new Dictionary<long, AnswerValue> { [journal.Questions.Get("mood")!.Current.Id] = AnswerValue.Of(4) }, env.Clock.Now);
         WriteAt(env, journal, Local(2026, 11, 25, 9, 5), "Second entry");
 
         var path = env.TempFile("out/journal.md");

@@ -21,7 +21,7 @@ public sealed class MergeTests : IDisposable
         Import(_homeJournal, ("mood", "Good mood"), ("sleep", "Slept well"));
         Write(_homeJournal, "Shared", "Written before the laptop copy was made.");
         _homeJournal.Answers.SaveForDay(_home.Clock.Today(), null,
-            new Dictionary<long, int> { [V(_homeJournal, "mood")] = 3 }, _home.Clock.Now);
+            new Dictionary<long, AnswerValue> { [V(_homeJournal, "mood")] = AnswerValue.Of(3) }, _home.Clock.Now);
 
         var backup = _home.TempFile("start.xjbackup");
         JournalTransfer.ExportEncrypted(_homeJournal, backup);
@@ -38,7 +38,7 @@ public sealed class MergeTests : IDisposable
 
     private static void Import(Journal journal, params (string Id, string Text)[] questions)
     {
-        var json = System.Text.Json.JsonSerializer.Serialize(new { questions = questions.Select(q => new { id = q.Id, text = q.Text }) });
+        var json = System.Text.Json.JsonSerializer.Serialize(new { questions = questions.Select(q => new { id = q.Id, type = "rating", text = q.Text }) });
         journal.QuestionImporter.Apply(journal.QuestionImporter.Plan(QuestionFileParser.Parse(json).Questions, archiveMissing: false));
     }
 
@@ -181,7 +181,7 @@ public sealed class MergeTests : IDisposable
         _laptop.Clock.Advance(TimeSpan.FromDays(1));
         Import(_laptopJournal, ("mood", "I was in a good mood"), ("focus", "I could focus"));
         _laptopJournal.Answers.SaveForDay(_laptop.Clock.Today(), null,
-            new Dictionary<long, int> { [V(_laptopJournal, "mood")] = 5, [V(_laptopJournal, "focus")] = 2 }, _laptop.Clock.Now);
+            new Dictionary<long, AnswerValue> { [V(_laptopJournal, "mood")] = AnswerValue.Of(5), [V(_laptopJournal, "focus")] = AnswerValue.Of(2) }, _laptop.Clock.Now);
 
         var summary = MergeLaptopIntoHome();
 
@@ -203,14 +203,14 @@ public sealed class MergeTests : IDisposable
         var mood = V(_homeJournal, "mood");
         var sleep = V(_homeJournal, "sleep");
         _home.Clock.Advance(TimeSpan.FromHours(1));
-        _homeJournal.Answers.SaveForDay(today, null, new Dictionary<long, int> { [mood] = 1 }, _home.Clock.Now);
+        _homeJournal.Answers.SaveForDay(today, null, new Dictionary<long, AnswerValue> { [mood] = AnswerValue.Of(1) }, _home.Clock.Now);
         _laptop.Clock.Advance(TimeSpan.FromHours(2));
         _laptopJournal.Answers.SaveForDay(today, null,
-            new Dictionary<long, int> { [V(_laptopJournal, "mood")] = 4, [V(_laptopJournal, "sleep")] = 2 }, _laptop.Clock.Now);
+            new Dictionary<long, AnswerValue> { [V(_laptopJournal, "mood")] = AnswerValue.Of(4), [V(_laptopJournal, "sleep")] = AnswerValue.Of(2) }, _laptop.Clock.Now);
 
         Assert.Equal(1, MergeLaptopIntoHome().MergedAnswerDays);
         var merged = _homeJournal.Answers.GetForDay(today)!;
-        Assert.Equal(new Dictionary<long, int> { [mood] = 4, [sleep] = 2 }, merged.Values);
+        Assert.Equal(new Dictionary<long, AnswerValue> { [mood] = AnswerValue.Of(4), [sleep] = AnswerValue.Of(2) }, merged.Values);
         Assert.Equal(_laptop.Clock.Now, merged.AnsweredAt);
     }
 
@@ -220,14 +220,14 @@ public sealed class MergeTests : IDisposable
         var today = _home.Clock.Today();
         _laptop.Clock.Advance(TimeSpan.FromHours(1));
         _laptopJournal.Answers.SaveForDay(today, null,
-            new Dictionary<long, int> { [V(_laptopJournal, "mood")] = 1, [V(_laptopJournal, "sleep")] = 5 }, _laptop.Clock.Now);
+            new Dictionary<long, AnswerValue> { [V(_laptopJournal, "mood")] = AnswerValue.Of(1), [V(_laptopJournal, "sleep")] = AnswerValue.Of(5) }, _laptop.Clock.Now);
         _home.Clock.Advance(TimeSpan.FromHours(2));
-        _homeJournal.Answers.SaveForDay(today, null, new Dictionary<long, int> { [V(_homeJournal, "mood")] = 4 }, _home.Clock.Now);
+        _homeJournal.Answers.SaveForDay(today, null, new Dictionary<long, AnswerValue> { [V(_homeJournal, "mood")] = AnswerValue.Of(4) }, _home.Clock.Now);
 
         MergeLaptopIntoHome();
         var merged = _homeJournal.Answers.GetForDay(today)!;
-        Assert.Equal(4, merged.Values[V(_homeJournal, "mood")]);
-        Assert.Equal(5, merged.Values[V(_homeJournal, "sleep")]);
+        Assert.Equal(AnswerValue.Of(4), merged.Values[V(_homeJournal, "mood")]);
+        Assert.Equal(AnswerValue.Of(5), merged.Values[V(_homeJournal, "sleep")]);
     }
 
     [Fact]
@@ -265,6 +265,22 @@ public sealed class MergeTests : IDisposable
         var path = _laptop.TempFile("laptop.xjbackup");
         JournalTransfer.ExportEncrypted(_laptopJournal, path);
         Assert.Throws<InvalidPasswordException>(() => JournalTransfer.ReadBackup(path, "nope nope"));
+    }
+
+    [Fact]
+    public void Merging_combines_answers_of_every_type()
+    {
+        TransferTests.PopulateAllTypes(_laptopJournal, _laptop.Clock);
+
+        var plan = JournalMerger.Plan(_homeJournal, JournalTransfer.BuildExport(_laptopJournal));
+        JournalMerger.Apply(_homeJournal, plan);
+
+        var merged = _homeJournal.Answers.GetForDay(_home.Clock.Today())!.Values;
+        Assert.Equal(AnswerValue.Of(3), merged[V(_homeJournal, "mood")]); // home's earlier answer is kept
+        Assert.Equal(AnswerValue.OfText("Finished the \"big\" puzzle ✨"), merged[V(_homeJournal, "good")]);
+        Assert.Equal(["Gym", "Rest"], merged[V(_homeJournal, "did")].Choices);
+        Assert.Equal(QuestionType.Number, _homeJournal.Questions.Get("hours")!.Current.Type);
+        Assert.False(JournalMerger.Plan(_homeJournal, JournalTransfer.BuildExport(_laptopJournal)).Summary.HasChanges);
     }
 }
 
@@ -318,15 +334,19 @@ public class RevisionTests
     }
 
     [Fact]
-    public void A_version_1_journal_is_upgraded_when_opened()
+    public void A_version_1_journal_is_upgraded_to_the_latest_schema()
     {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        XJournal.Core.Storage.Schema.Migrate(connection, 1); // a journal from 1.0.0
+        XJournal.Core.Storage.Schema.Migrate(connection);
+
+        Assert.Equal(XJournal.Core.Storage.Schema.CurrentVersion, connection.ExecuteScalar<int>("PRAGMA user_version"));
+        Assert.Equal(0, connection.ExecuteScalar<int>("SELECT count(*) FROM entry_revisions"));
+        Assert.Equal(0, connection.ExecuteScalar<int>("SELECT count(value_num) + count(value_text) FROM answers"));
+
         using var env = new TestEnv();
-        using (var journal = env.CreateJournal())
-        {
-            journal.Database.Connection.Execute("DROP TABLE entry_revisions; PRAGMA user_version = 1;");
-        }
-        using var reopened = env.Accounts.SignIn("jordan", TestEnv.Password);
-        Assert.Equal(2, reopened.Database.SchemaVersion);
-        Assert.Empty(reopened.Entries.GetAllRevisions());
+        using var journal = env.CreateJournal();
+        Assert.Equal(XJournal.Core.Storage.Schema.CurrentVersion, journal.Database.SchemaVersion);
     }
 }

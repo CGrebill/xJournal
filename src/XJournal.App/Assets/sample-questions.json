@@ -2,27 +2,35 @@
   // xJournal question file.
   // - "id" must never change for a question: answers are tracked by it.
   //   Rewording a question (same id, new text) keeps its history; the old wording is remembered.
+  // - Every question has a "type":
+  //     "scale"   numbered buttons, 1–10 unless you set "min"/"max" (0–10); optional "low"/"high" words for the ends
+  //     "rating"  labeled steps; "labels" lists 2–7 of them, lowest first (default: agree/disagree)
+  //     "yesno"   Yes / No
+  //     "choice"  your own "options" (2–20); add "multiple": true to allow picking several
+  //     "number"  any number, with an optional "unit"
+  //     "text"    a short sentence (up to 200 characters)
+  // - A question can't change type later: to change it, give it a new id.
   // - When you import a file that replaces your question set (the default), questions left out
   //   of it are archived: hidden from the check-in, with their answers kept.
-  // - "scale" lists the 5 answer labels from lowest (1) to highest (5). It can be set for the
-  //   whole file and overridden per question.
-  "version": 1,
-  "scale": [
-    "Entirely disagree",
-    "Somewhat disagree",
-    "Neither agree nor disagree",
-    "Somewhat agree",
-    "Entirely agree"
-  ],
+  "version": 2,
   "questions": [
-    { "id": "energy", "text": "I had plenty of energy today." },
-    { "id": "mood", "text": "My mood was generally good." },
-    { "id": "focus", "text": "I could focus when I needed to." },
-    { "id": "sleep", "text": "I slept well last night." },
+    { "id": "day", "type": "scale", "text": "How was today overall?", "low": "Awful", "high": "Great" },
+    { "id": "mood", "type": "rating", "text": "My mood was generally good." },
     {
       "id": "stress",
+      "type": "rating",
       "text": "How stressed did I feel?",
-      "scale": ["Not at all", "A little", "Moderately", "Very", "Extremely"]
-    }
+      "labels": ["Not at all", "A little", "Moderately", "Very", "Extremely"]
+    },
+    { "id": "exercise", "type": "yesno", "text": "Did I exercise today?" },
+    {
+      "id": "did",
+      "type": "choice",
+      "text": "What did I spend time on?",
+      "options": ["Work", "Study", "Exercise", "Friends", "Family", "Rest"],
+      "multiple": true
+    },
+    { "id": "sleep", "type": "number", "text": "How many hours did I sleep?", "unit": "hours" },
+    { "id": "good", "type": "text", "text": "One good thing about today" }
   ]
 }

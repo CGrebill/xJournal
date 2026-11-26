@@ -1,3 +1,4 @@
+using XJournal.Core.Models;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -245,24 +246,128 @@ public sealed class UiTests : IDisposable
         window.DataContext = vm;
         window.Show();
         Pump();
-        Assert.Equal(5, vm.Items.Count);
+        // The sample has one question of each kind, each shown with its own controls.
+        Assert.Collection(vm.Items,
+            i => Assert.IsType<ScaleItemViewModel>(i),
+            i => Assert.IsType<PickItemViewModel>(i),
+            i => Assert.IsType<PickItemViewModel>(i),
+            i => Assert.IsType<PickItemViewModel>(i),
+            i => Assert.IsType<ChoiceItemViewModel>(i),
+            i => Assert.IsType<NumberItemViewModel>(i),
+            i => Assert.IsType<TextItemViewModel>(i));
+        Assert.Equal(10, ((ScaleItemViewModel)vm.Items[0]).Options.Count);
 
-        // Click the "4" choice of the first question.
-        var choice = window.GetVisualDescendants().OfType<RadioButton>().ElementAt(3);
-        choice.IsChecked = true;
+        // Click "4" on the 1–10 scale: it saves straight away.
+        var four = window.GetVisualDescendants().OfType<RadioButton>().ElementAt(3);
+        four.IsChecked = true;
         Pump();
-        Assert.Equal(4, vm.Items[0].Value);
-        vm.Items[1].Value = 2;
-        vm.Items[4].Value = 5;
+        Assert.Equal(AnswerValue.Of(4), journal.Answers.GetForDay(journal.Clock.Today())!.Values[vm.Items[0].Version.Id]);
+        Assert.False(mainVm.ShowReminder);
+
+        Pick(vm.Items[1], 1);          // rating: "Somewhat disagree"
+        Pick(vm.Items[3], 0);          // yes
+        Pick(vm.Items[4], 0);          // several choices
+        Pick(vm.Items[4], 3);
+        ((NumberItemViewModel)vm.Items[5]).Input = "7.5";
+        ((TextItemViewModel)vm.Items[6]).Input = "A sunny walk";
         Pump();
+        Assert.Equal("6 of 7 answered", vm.Progress);
         Screenshot(window, "08-questions");
 
-        var saved = journal.Answers.GetForDay(journal.Clock.Today())!;
-        Assert.Equal(3, saved.Values.Count);
-        Assert.Equal(4, saved.Values[vm.Items[0].Version.Id]);
-        Assert.False(mainVm.ShowReminder);
+        // Picking another single option replaces the first; picking a picked option again in a choice removes it.
+        Pick(vm.Items[1], 2);
+        Pick(vm.Items[4], 3);
+        ((NumberItemViewModel)vm.Items[5]).Input = "lots";
+        Assert.False(vm.Items[5].IsAnswered);
+        Assert.NotEmpty(((NumberItemViewModel)vm.Items[5]).Error);
+        ((NumberItemViewModel)vm.Items[5]).Input = "7.5";
+
+        // Typed answers save after a pause, or when the window closes.
         window.Close();
+        var saved = journal.Answers.GetForDay(journal.Clock.Today())!.Values;
+        AnswerValue Saved(int item) => saved[vm.Items[item].Version.Id];
+        Assert.Equal(6, saved.Count);
+        Assert.Equal(AnswerValue.Of(3), Saved(1));
+        Assert.Equal(AnswerValue.OfBool(true), Saved(3));
+        Assert.Equal(["Work"], Saved(4).Choices);
+        Assert.Equal(AnswerValue.Of(7.5), Saved(5));
+        Assert.Equal(AnswerValue.OfText("A sunny walk"), Saved(6));
         main.Close();
+    }
+
+    private static void Pick(QuestionItemViewModel item, int option) =>
+        ((PickItemViewModel)item).Options[option].IsSelected = !((PickItemViewModel)item).Options[option].IsSelected;
+
+    [AvaloniaFact]
+    public void Answers_can_be_cleared()
+    {
+        var journal = _accounts.Create("jordan", Password);
+        ImportSampleQuestions(journal);
+        var vm = new QuestionsViewModel(journal, new WindowDialogs(new QuestionsWindow()), () => null);
+        Pick(vm.Items[3], 1); // no
+        Assert.True(journal.Answers.HasAnswered(journal.Clock.Today()));
+
+        vm.Items[3].ClearCommand.Execute(null);
+        Assert.False(vm.Items[3].IsAnswered);
+        Assert.False(journal.Answers.HasAnswered(journal.Clock.Today()));
+    }
+
+    [AvaloniaFact]
+    public void Trends_show_each_question_type_its_own_way()
+    {
+        var journal = _accounts.Create("jordan", Password);
+        ImportSampleQuestions(journal);
+        var today = journal.Clock.Today();
+        var q = journal.Questions.GetAll().ToDictionary(x => x.Id, x => x.Current.Id);
+        for (var i = 20; i >= 0; i--)
+        {
+            journal.Answers.SaveForDay(today.AddDays(-i), null, new Dictionary<long, AnswerValue>
+            {
+                [q["day"]] = AnswerValue.Of(1 + i % 10),
+                [q["exercise"]] = AnswerValue.OfBool(i % 3 != 0),
+                [q["did"]] = AnswerValue.OfChoices(i % 2 == 0 ? ["Work", "Rest"] : ["Friends"]),
+                [q["sleep"]] = AnswerValue.Of(6 + i % 4 * 0.5),
+                [q["good"]] = AnswerValue.OfText($"Good thing #{i}"),
+            }, journal.Clock.Now);
+        }
+
+        var trends = new TrendsWindow { DataContext = new TrendsViewModel(journal, _ => { }) };
+        trends.Show();
+        var vm = (TrendsViewModel)trends.DataContext;
+        vm.SelectedRange = vm.Ranges[0];
+        void Select(string id) { vm.SelectedQuestion = vm.Questions.Single(x => x.Question?.Id == id); Pump(); }
+
+        Select("day");
+        Assert.True(vm.IsLine);
+        Assert.Equal((1.0, 10.0), (vm.ChartMinimum, vm.ChartMaximum));
+        Assert.Equal(21, vm.Points.Count);
+        Assert.Contains(vm.Legend, l => l.Contains("Great", StringComparison.Ordinal));
+        Screenshot(trends, "20-trends-scale");
+
+        Select("exercise");
+        Assert.True(vm.IsBars);
+        Assert.StartsWith("Yes on 14 of 21 days (67%)", vm.Stats, StringComparison.Ordinal);
+        Assert.All(vm.AnswerBars, b => Assert.InRange(b.Value, 0, 100));
+        Screenshot(trends, "21-trends-yesno");
+
+        Select("did");
+        Assert.True(vm.IsBars);
+        Assert.Equal(11, vm.AnswerBars.Single(b => b.Label == "Work").Value);
+        Assert.Equal(10, vm.AnswerBars.Single(b => b.Label == "Friends").Value);
+        Assert.Equal(0, vm.AnswerBars.Single(b => b.Label == "Study").Value);
+        Screenshot(trends, "22-trends-choice");
+
+        Select("sleep");
+        Assert.True(vm.IsLine);
+        Assert.Contains("hours", vm.Stats, StringComparison.Ordinal);
+        Assert.True(vm.ChartMaximum >= 7.5);
+
+        Select("good");
+        Assert.True(vm.IsList);
+        Assert.Equal("Good thing #0", vm.TextAnswers[0].Text); // newest first
+        Assert.Equal(21, vm.TextAnswers.Count);
+        Screenshot(trends, "23-trends-text");
+        trends.Close();
     }
 
     [AvaloniaFact]
@@ -277,13 +382,13 @@ public sealed class UiTests : IDisposable
         {
             if (i % 6 == 0) continue;
             journal.Answers.SaveForDay(today.AddDays(-i), null,
-                new Dictionary<long, int> { [mood] = Math.Clamp(3 + random.Next(-2, 3), 1, 5) }, journal.Clock.Now);
+                new Dictionary<long, AnswerValue> { [mood] = AnswerValue.Of(Math.Clamp(3 + random.Next(-2, 3), 1, 5)) }, journal.Clock.Now);
         }
         // Reword the question partway through.
-        var reworded = QuestionFileParser.Parse("""{"questions":[{"id":"mood","text":"Overall, I was in a good mood."}]}""");
+        var reworded = QuestionFileParser.Parse("""{"questions":[{"id":"mood","type":"rating","text":"Overall, I was in a good mood."}]}""");
         journal.QuestionImporter.Apply(journal.QuestionImporter.Plan(reworded.Questions, archiveMissing: false));
         var v2 = journal.Questions.Get("mood")!.Current.Id;
-        journal.Answers.SaveForDay(today, null, new Dictionary<long, int> { [v2] = 4 }, journal.Clock.Now);
+        journal.Answers.SaveForDay(today, null, new Dictionary<long, AnswerValue> { [v2] = AnswerValue.Of(4) }, journal.Clock.Now);
 
         var (main, _) = OpenMain(journal);
         var trends = new TrendsWindow
@@ -437,7 +542,7 @@ public sealed class UiTests : IDisposable
         var journal = _accounts.Create("jordan", Password);
         ImportSampleQuestions(journal);
         journal.Answers.SaveForDay(journal.Clock.Today(), null,
-            new Dictionary<long, int> { [journal.Questions.Get("mood")!.Current.Id] = 4 }, journal.Clock.Now);
+            new Dictionary<long, AnswerValue> { [journal.Questions.Get("mood")!.Current.Id] = AnswerValue.Of(4) }, journal.Clock.Now);
         var (window, vm) = OpenMain(journal);
         foreach (var (summary, body) in new[] { ("Morning", "Coffee and plans."), ("Evening", "Long walk, good talk.") })
         {
@@ -602,7 +707,7 @@ public sealed class UiTests : IDisposable
             Screenshot(main, "11-main-dark");
             var window = new QuestionsWindow { DataContext = new QuestionsViewModel(journal, new WindowDialogs(main), () => null) };
             window.Show();
-            ((QuestionsViewModel)window.DataContext).Items[0].Value = 3;
+            Pick(((QuestionsViewModel)window.DataContext).Items[0], 6);
             Screenshot(window, "12-questions-dark");
             window.Close();
             main.Close();

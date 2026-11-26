@@ -28,7 +28,7 @@
       </StackPanel>
 
       <StackPanel Spacing="4" IsVisible="{Binding HasChanged}">
-        <TextBlock Classes="body-strong" Text="Reworded (a new version is added; old answers keep the old wording)" TextWrapping="Wrap" />
+        <TextBlock Classes="body-strong" Text="Changed (a new version is added; old answers keep the old wording)" TextWrapping="Wrap" />
         <ItemsControl ItemsSource="{Binding Changed}" />
       </StackPanel>
 

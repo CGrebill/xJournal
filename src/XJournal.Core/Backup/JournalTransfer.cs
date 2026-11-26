@@ -70,7 +70,7 @@ public sealed class JournalTransfer(AccountStore accounts)
             }).ToList(),
             QuestionVersions = versions.Select(v => new ExportQuestionVersion
             {
-                Key = v.Id, QuestionId = v.QuestionId, Text = v.Text, Scale = [.. v.Scale], CreatedAt = v.CreatedAt,
+                Key = v.Id, QuestionId = v.QuestionId, Text = v.Text, Type = v.Type.ToKey(), Config = v.Config, CreatedAt = v.CreatedAt,
             }).ToList(),
             AnswerSets = journal.Answers.GetAll().Select(s => new ExportAnswerSet
             {
@@ -79,7 +79,7 @@ public sealed class JournalTransfer(AccountStore accounts)
                 AnsweredAt = s.AnsweredAt,
                 Answers = s.Values.OrderBy(kv => kv.Key).Select(kv => new ExportAnswer
                 {
-                    QuestionId = questionByVersion[kv.Key], Version = kv.Key, Value = kv.Value,
+                    QuestionId = questionByVersion[kv.Key], Version = kv.Key, Number = kv.Value.Number, Text = kv.Value.Text,
                 }).ToList(),
             }).ToList(),
             Settings = journal.Settings.GetAll().ToDictionary(),
@@ -240,7 +240,18 @@ public sealed class JournalTransfer(AccountStore accounts)
         {
             if (!versions.TryAdd(version.Key, version)) errors.Add($"Duplicate question version key {version.Key}.");
             if (!questionIds.Contains(version.QuestionId)) errors.Add($"Question version {version.Key} refers to unknown question \"{version.QuestionId}\".");
-            if (version.Scale.Count != 5) errors.Add($"Question version {version.Key} doesn't have 5 scale labels.");
+            switch (version.ResolvedType)
+            {
+                case null:
+                    errors.Add($"Question version {version.Key} has an unknown type \"{version.Type}\".");
+                    break;
+                case QuestionType.Rating when (version.ResolvedConfig.Labels?.Count ?? 0) < QuestionFileParser.MinLabels:
+                    errors.Add($"Question version {version.Key} doesn't have its rating labels.");
+                    break;
+                case QuestionType.Choice when (version.ResolvedConfig.Options?.Count ?? 0) < QuestionFileParser.MinOptions:
+                    errors.Add($"Question version {version.Key} doesn't have its options.");
+                    break;
+            }
         }
         foreach (var question in export.Questions)
         {
@@ -257,8 +268,10 @@ public sealed class JournalTransfer(AccountStore accounts)
                 errors.Add($"Answers for {set.Day} refer to a missing entry.");
             foreach (var answer in set.Answers)
             {
-                if (!versions.ContainsKey(answer.Version)) errors.Add($"An answer on {set.Day} refers to an unknown question version.");
-                if (answer.Value is < 1 or > 5) errors.Add($"An answer on {set.Day} is outside 1–5.");
+                if (!versions.TryGetValue(answer.Version, out var version))
+                    errors.Add($"An answer on {set.Day} refers to an unknown question version.");
+                else if (version.ResolvedType is not null && AnswerRules.Validate(version.ToVersion(), answer.Answer) is { } problem)
+                    errors.Add($"The answer on {set.Day} to \"{version.Text}\" {problem}.");
             }
         }
 
@@ -300,18 +313,8 @@ public sealed class JournalTransfer(AccountStore accounts)
         var versionIds = new Dictionary<long, long>();
         foreach (var v in export.QuestionVersions)
         {
-            versionIds[v.Key] = connection.ExecuteScalar<long>(
-                """
-                INSERT INTO question_versions (question_id, text, scale_json, content_hash, created_utc, created_offset)
-                VALUES ($QuestionId, $Text, $scaleJson, $hash, $utc, $offset) RETURNING id
-                """,
-                new
-                {
-                    v.QuestionId, v.Text,
-                    scaleJson = JsonSerializer.Serialize(v.Scale),
-                    hash = QuestionImporter.ContentHash(v.Text, v.Scale),
-                    utc = DbTime.Utc(v.CreatedAt), offset = DbTime.Offset(v.CreatedAt),
-                }, transaction);
+            versionIds[v.Key] = QuestionImporter.InsertVersion(
+                connection, v.QuestionId, v.Text, v.ResolvedType!.Value, v.ResolvedConfig, v.CreatedAt, transaction);
         }
 
         foreach (var q in export.Questions)
@@ -331,11 +334,7 @@ public sealed class JournalTransfer(AccountStore accounts)
                     utc = DbTime.Utc(s.AnsweredAt), offset = DbTime.Offset(s.AnsweredAt),
                 }, transaction);
             foreach (var a in s.Answers)
-            {
-                connection.Execute(
-                    "INSERT INTO answers (answer_set_id, question_version_id, value) VALUES ($setId, $versionId, $Value)",
-                    new { setId, versionId = versionIds[a.Version], a.Value }, transaction);
-            }
+                AnswerRepository.Insert(connection, setId, versionIds[a.Version], a.Answer, transaction);
         }
 
         foreach (var (key, value) in export.Settings)

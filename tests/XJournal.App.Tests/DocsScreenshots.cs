@@ -7,6 +7,7 @@ using XJournal.App.ViewModels;
 using XJournal.App.Views;
 using XJournal.Core;
 using XJournal.Core.Accounts;
+using XJournal.Core.Models;
 using XJournal.Core.Questions;
 using XJournal.Core.Sessions;
 
@@ -54,11 +55,13 @@ public sealed class DocsScreenshots : IDisposable
     {
         // Questions, imported "two months ago".
         var questionsJson = """
-            {"questions":[
-              {"id":"energy","text":"I had plenty of energy today."},
-              {"id":"mood","text":"My mood was generally good."},
-              {"id":"focus","text":"I could focus when I needed to."},
-              {"id":"sleep","text":"I slept well last night."}
+            {"version":2,"questions":[
+              {"id":"day","type":"scale","text":"How was today overall?","low":"Awful","high":"Great"},
+              {"id":"mood","type":"rating","text":"My mood was generally good."},
+              {"id":"walk","type":"yesno","text":"Did I get outside for a walk?"},
+              {"id":"did","type":"choice","text":"What did I spend time on?","options":["Work","Friends","Family","Reading","Rest"],"multiple":true},
+              {"id":"sleep","type":"number","text":"How many hours did I sleep?","unit":"hours"},
+              {"id":"good","type":"text","text":"One good thing about today"}
             ]}
             """;
         var random = new Random(11);
@@ -88,9 +91,19 @@ public sealed class DocsScreenshots : IDisposable
 
             if (ago % 7 == 5) continue; // a few missed check-ins
             mood = Math.Clamp(mood + random.Next(-1, 2) * 0.8, 1, 5);
+            string[] options = ["Work", "Friends", "Family", "Reading", "Rest"];
+            string[] goodThings = ["Coffee on the balcony", "A long call with Sam", "Finished my book", "Fresh bread from the bakery", "Sunshine at lunch"];
             var values = journal.Questions.GetAll().ToDictionary(
                 q => q.Current.Id,
-                q => q.Id == "mood" ? (int)Math.Round(mood) : Math.Clamp((int)Math.Round(mood) + random.Next(-1, 2), 1, 5));
+                q => q.Id switch
+                {
+                    "day" => AnswerValue.Of(Math.Clamp((int)Math.Round(mood * 2) + random.Next(-1, 2), 1, 10)),
+                    "mood" => AnswerValue.Of((int)Math.Round(mood)),
+                    "walk" => AnswerValue.OfBool(random.Next(3) > 0),
+                    "did" => AnswerValue.OfChoices(options.Where((_, i) => i == ago % 5 || random.Next(3) == 0)),
+                    "sleep" => AnswerValue.Of(6 + random.Next(0, 9) * 0.25),
+                    _ => AnswerValue.OfText(goodThings[ago % goodThings.Length]),
+                });
             journal.Answers.SaveForDay(journal.Clock.Today(), entryId, values, journal.Clock.Now);
         }
     }
@@ -156,13 +169,17 @@ public sealed class DocsScreenshots : IDisposable
             Save(main, "calendar");
             vm.ActivePane = MainPane.Editor;
 
-            var checkIn = new QuestionsWindow();
+            var checkIn = new QuestionsWindow { Height = 910 }; // tall enough to show every question type
             var questions = new QuestionsViewModel(journal, new WindowDialogs(checkIn), () => vm.Session.Current.Id);
             checkIn.DataContext = questions;
             checkIn.Show();
-            questions.Items[0].Value = 4;
-            questions.Items[1].Value = 4;
-            questions.Items[2].Value = 3;
+            ((PickItemViewModel)questions.Items[0]).Options[7].IsSelected = true;  // 8 / 10
+            ((PickItemViewModel)questions.Items[1]).Options[3].IsSelected = true;  // somewhat agree
+            ((PickItemViewModel)questions.Items[2]).Options[0].IsSelected = true;  // yes
+            ((PickItemViewModel)questions.Items[3]).Options[1].IsSelected = true;  // friends
+            ((PickItemViewModel)questions.Items[3]).Options[3].IsSelected = true;  // reading
+            ((NumberItemViewModel)questions.Items[4]).Input = "7.5";
+            ((TextItemViewModel)questions.Items[5]).Input = "Tomatoes from the market";
             Save(checkIn, "check-in");
             checkIn.Close();
 

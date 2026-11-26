@@ -38,7 +38,7 @@ public static class MarkdownExporter
         var culture = options.Culture ?? CultureInfo.CurrentCulture;
         var entries = journal.Entries.Search(new EntryQuery(null, options.From, options.To, int.MaxValue))
             .Select(r => r.Entry).Reverse().ToList();
-        var checkIns = options.IncludeCheckIns ? CheckInsByEntry(journal, entries) : [];
+        var checkIns = options.IncludeCheckIns ? CheckInsByEntry(journal, entries, culture) : [];
 
         if (options.OneFilePerEntry)
         {
@@ -115,7 +115,7 @@ public static class MarkdownExporter
     private static string Cell(string value) => value.Replace("|", "\\|").Replace("\n", " ");
 
     /// <summary>Check-in rows per entry: answers linked to an entry go with it; unlinked ones go with that day's first entry.</summary>
-    private static Dictionary<long, List<string[]>> CheckInsByEntry(Journal journal, List<JournalEntry> entries)
+    private static Dictionary<long, List<string[]>> CheckInsByEntry(Journal journal, List<JournalEntry> entries, CultureInfo culture)
     {
         var result = new Dictionary<long, List<string[]>>();
         if (entries.Count == 0) return result;
@@ -133,8 +133,7 @@ public static class MarkdownExporter
             foreach (var (versionId, value) in set.Values.OrderBy(kv => order.GetValueOrDefault(versions[kv.Key].QuestionId, int.MaxValue)))
             {
                 var version = versions[versionId];
-                var label = value >= 1 && value <= version.Scale.Count ? version.Scale[value - 1] : "";
-                rows.Add([version.Text, $"{value} – {label}"]);
+                rows.Add([version.Text, Questions.AnswerRules.Format(version, value, culture)]);
             }
         }
         return result;

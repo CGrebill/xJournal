@@ -1,3 +1,4 @@
+using XJournal.Core.Models;
 using XJournal.Core.Sessions;
 
 namespace XJournal.Core.Tests;
@@ -147,7 +148,7 @@ public class EntrySessionTests
         var session = new EntrySession(journal);
         session.Begin();
         journal.Answers.SaveForDay(env.Clock.Today(), session.Current.IsPersisted ? session.Current.Id : null,
-            new Dictionary<long, int>(), env.Clock.Now);
+            new Dictionary<long, AnswerValue>(), env.Clock.Now);
 
         session.SetText("", "Now writing");
         session.Save();

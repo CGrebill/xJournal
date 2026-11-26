@@ -172,7 +172,7 @@ public static class JournalMerger
 
             foreach (var v in incoming.QuestionVersions.Where(v => v.QuestionId == q.Id))
             {
-                var hash = QuestionImporter.ContentHash(v.Text, v.Scale);
+                var hash = QuestionImporter.ContentHash(v.Text, v.ResolvedType!.Value, v.ResolvedConfig);
                 if (versionIdByHash.TryGetValue((q.Id, hash), out var existing))
                 {
                     localVersionForKey[v.Key] = existing;
@@ -181,7 +181,7 @@ public static class JournalMerger
                 if (!isNew) newWordings++;
                 if (write)
                 {
-                    var id = local.QuestionImporter.GetOrAddVersion(q.Id, v.Text, v.Scale, v.CreatedAt, transaction!);
+                    var id = local.QuestionImporter.GetOrAddVersion(q.Id, v.Text, v.ResolvedType!.Value, v.ResolvedConfig, v.CreatedAt, transaction!);
                     versionIdByHash[(q.Id, hash)] = id;
                     versionById[id] = new VersionRow { Id = id, QuestionId = q.Id, ContentHash = hash, CreatedUtc = DbTime.Utc(v.CreatedAt) };
                     localVersionForKey[v.Key] = id;
@@ -217,26 +217,26 @@ public static class JournalMerger
                         "INSERT INTO answer_sets (day, entry_id, answered_utc, answered_offset) VALUES ($Day, $entryId, $u, $o) RETURNING id",
                         new { s.Day, entryId, u = DbTime.Utc(s.AnsweredAt), o = DbTime.Offset(s.AnsweredAt) }, transaction);
                     foreach (var a in s.Answers)
-                        InsertAnswer(setId, localVersionForKey[a.Version]!.Value, a.Value);
+                        InsertAnswer(setId, localVersionForKey[a.Version]!.Value, a.Answer);
                 }
                 continue;
             }
 
             var theirsNewer = DbTime.Utc(s.AnsweredAt) > mine.AnsweredUtc;
             var changed = false;
-            var values = new Dictionary<long, int>(mine.Values);
+            var values = new Dictionary<long, AnswerValue>(mine.Values);
             foreach (var a in s.Answers)
             {
                 var versionId = localVersionForKey[a.Version];
                 if (versionId is null) { changed = true; continue; } // dry run: a new wording
                 if (!values.TryGetValue(versionId.Value, out var ours))
                 {
-                    values[versionId.Value] = a.Value;
+                    values[versionId.Value] = a.Answer;
                     changed = true;
                 }
-                else if (ours != a.Value && theirsNewer)
+                else if (ours != a.Answer && theirsNewer)
                 {
-                    values[versionId.Value] = a.Value;
+                    values[versionId.Value] = a.Answer;
                     changed = true;
                 }
             }
@@ -265,10 +265,8 @@ public static class JournalMerger
             return true;
         }
 
-        void InsertAnswer(long setId, long versionId, int value) =>
-            connection.Execute(
-                "INSERT INTO answers (answer_set_id, question_version_id, value) VALUES ($setId, $versionId, $value)",
-                new { setId, versionId, value }, transaction);
+        void InsertAnswer(long setId, long versionId, AnswerValue value) =>
+            AnswerRepository.Insert(connection, setId, versionId, value, transaction);
     }
 
     // ---- snapshot reads (transaction-aware) -------------------------------------------------
@@ -289,10 +287,8 @@ public static class JournalMerger
     private static List<SetRow> ReadAnswerSets(SqliteConnection c, SqliteTransaction? t)
     {
         var sets = c.Query<SetRow>("SELECT id, day, answered_utc FROM answer_sets", transaction: t).ToList();
-        var answers = c.Query<(long SetId, long VersionId, long Value)>(
-                "SELECT answer_set_id, question_version_id, value FROM answers", transaction: t)
-            .ToLookup(a => a.SetId);
-        foreach (var s in sets) s.Values = answers[s.Id].ToDictionary(a => a.VersionId, a => (int)a.Value);
+        var answers = AnswerRepository.ReadValues(c, t);
+        foreach (var s in sets) s.Values = answers.GetValueOrDefault(s.Id) ?? [];
         return sets;
     }
 
@@ -327,6 +323,6 @@ public static class JournalMerger
         public long Id { get; set; }
         public string Day { get; set; } = "";
         public long AnsweredUtc { get; set; }
-        public Dictionary<long, int> Values { get; set; } = [];
+        public Dictionary<long, AnswerValue> Values { get; set; } = [];
     }
 }

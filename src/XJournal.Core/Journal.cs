@@ -18,7 +18,7 @@ public sealed class Journal : IDisposable
         Clock = clock;
         Entries = new EntryRepository(database, clock);
         Questions = new QuestionRepository(database);
-        Answers = new AnswerRepository(database);
+        Answers = new AnswerRepository(database, Questions);
         Settings = new SettingsRepository(database);
         QuestionImporter = new QuestionImporter(database, Questions, clock);
     }

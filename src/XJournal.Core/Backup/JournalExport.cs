@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using XJournal.Core.Models;
 
 namespace XJournal.Core.Backup;
 
@@ -10,7 +11,8 @@ namespace XJournal.Core.Backup;
 public sealed class JournalExport
 {
     public const string FormatName = "xjournal-export";
-    public const int CurrentFormatVersion = 1;
+    /// <summary>2 added question types; version 1 files (all 1–5 ratings) still import.</summary>
+    public const int CurrentFormatVersion = 2;
 
     public string? Format { get; set; }
     public int FormatVersion { get; set; } = CurrentFormatVersion;
@@ -71,8 +73,28 @@ public sealed class ExportQuestionVersion
     public long Key { get; set; }
     public string QuestionId { get; set; } = "";
     public string Text { get; set; } = "";
-    public List<string> Scale { get; set; } = [];
+
+    /// <summary>The question type ("rating", "scale", …). Missing in version 1 files, where every question is a rating.</summary>
+    public string? Type { get; set; }
+
+    /// <summary>The type's settings (labels, range, options, unit).</summary>
+    public QuestionConfig? Config { get; set; }
+
+    /// <summary>Version 1 only: the rating labels.</summary>
+    public List<string>? Scale { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The type, or null if it isn't a known one.</summary>
+    [JsonIgnore]
+    public QuestionType? ResolvedType => Type is null ? QuestionType.Rating : QuestionTypes.TryParse(Type, out var t) ? t : null;
+
+    [JsonIgnore]
+    public QuestionConfig ResolvedConfig => Config ?? (Scale is null ? new QuestionConfig() : new QuestionConfig { Labels = Scale });
+
+    /// <summary>This version as the database stores it (only valid once <see cref="ResolvedType"/> is known).</summary>
+    internal QuestionVersion ToVersion() =>
+        new(Key, QuestionId, Text, ResolvedType ?? QuestionType.Rating, ResolvedConfig, "", CreatedAt);
 }
 
 public sealed class ExportAnswerSet
@@ -87,5 +109,16 @@ public sealed class ExportAnswer
 {
     public string QuestionId { get; set; } = "";
     public long Version { get; set; }
-    public int Value { get; set; }
+
+    /// <summary>Numeric answers (rating, scale, number; yes/no as 1/0).</summary>
+    public double? Number { get; set; }
+
+    /// <summary>Text answers; choice answers as a JSON array of the picked options.</summary>
+    public string? Text { get; set; }
+
+    /// <summary>Version 1 only: the 1–5 answer.</summary>
+    public double? Value { get; set; }
+
+    [JsonIgnore]
+    public AnswerValue Answer => new() { Number = Number ?? (Text is null ? Value : null), Text = Text };
 }

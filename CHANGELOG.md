@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 (unreleased)
+
+**New**
+- Check-in questions can now be different types: a 1–10 **scale** (with optional words for each end), a labeled **rating** (the agree/disagree style from before), **yes/no**, multiple **choice** with your own options (pick one, or several), a **number** with an optional unit, or a short **text** answer.
+- Trends show each type in the way that fits it: a line chart for scales, ratings and numbers; the share of "yes" answers per week or month, plus your current streak, for yes/no; how often each option was picked for choices; and a list of past answers for text.
+- Today's answers can be cleared.
+
+**Changed**
+- Question files are now version 2: every question needs a `"type"`, and rating labels are listed as `"labels"`. Save the sample question file to see every type. Version 1 files are no longer imported.
+- Your existing questions and answers carry over as ratings, unchanged.
+- JSON exports are now version 2 (they include question types); version 1 exports still import.
+
 ## 1.0.2 (2026-11-26)
 
 **Fixed**

@@ -106,16 +106,47 @@ internal static class Schema
         );
         CREATE INDEX ix_revisions_entry ON entry_revisions(entry_id);
         """,
+
+        // ---- v3: question types (rating, scale, yes/no, choice, number, text) ---------------
+        // Existing questions were all labeled 1–5 ratings: their labels move into config_json.
+        // scale_json is kept (rating labels, '[]' for other types) so older code paths stay simple.
+        """
+        ALTER TABLE question_versions ADD COLUMN type TEXT NOT NULL DEFAULT 'rating';
+        ALTER TABLE question_versions ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}';
+        DROP TRIGGER question_versions_immutable;
+        UPDATE question_versions SET config_json = '{"labels":' || scale_json || '}';
+        CREATE TRIGGER question_versions_immutable BEFORE UPDATE ON question_versions BEGIN
+            SELECT RAISE(ABORT, 'Question versions are immutable.');
+        END;
+
+        -- Answers hold a number (rating, scale, number; yes/no as 1/0) or text (text; choice as a JSON array).
+        CREATE TABLE answers_v3 (
+            answer_set_id       INTEGER NOT NULL REFERENCES answer_sets(id) ON DELETE CASCADE,
+            question_version_id INTEGER NOT NULL REFERENCES question_versions(id),
+            value_num           REAL,
+            value_text          TEXT,
+            CHECK ((value_num IS NULL) <> (value_text IS NULL)),
+            PRIMARY KEY (answer_set_id, question_version_id)
+        );
+        INSERT INTO answers_v3 (answer_set_id, question_version_id, value_num)
+            SELECT answer_set_id, question_version_id, value FROM answers;
+        DROP TABLE answers;
+        ALTER TABLE answers_v3 RENAME TO answers;
+        CREATE INDEX ix_answers_version ON answers(question_version_id);
+        """,
     ];
 
     public static int CurrentVersion => Migrations.Length;
 
-    public static void Migrate(SqliteConnection connection)
+    public static void Migrate(SqliteConnection connection) => Migrate(connection, CurrentVersion);
+
+    /// <summary>Migrates up to <paramref name="target"/> (tests use this to build older databases).</summary>
+    internal static void Migrate(SqliteConnection connection, int target)
     {
         var version = connection.ExecuteScalar<int>("PRAGMA user_version");
         if (version > CurrentVersion) throw new NewerVersionException(version, CurrentVersion);
 
-        for (var next = version; next < CurrentVersion; next++)
+        for (var next = version; next < target; next++)
         {
             using var transaction = connection.BeginTransaction();
             connection.Execute(Migrations[next], transaction: transaction);

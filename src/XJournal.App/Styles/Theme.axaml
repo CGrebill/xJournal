@@ -110,7 +110,7 @@
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
 
-  <!-- 1–5 answer choices: pill buttons laid out in a row -->
+  <!-- Check-in answers (ratings, scales, yes/no): pill buttons laid out in a row -->
   <Style Selector="RadioButton.choice">
     <Setter Property="Template">
       <ControlTemplate>
@@ -142,6 +142,22 @@
   </Style>
   <Style Selector="RadioButton.choice:checked /template/ TextBlock#PART_Number">
     <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+  </Style>
+  <!-- Buttons with no label underneath (scale numbers, yes/no) -->
+  <Style Selector="RadioButton.choice.compact /template/ Border#PART_Pill">
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="4,6" />
+  </Style>
+  <Style Selector="RadioButton.choice.compact /template/ ContentPresenter">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
+  <!-- Choice options: rounded toggles that wrap onto more lines -->
+  <Style Selector="ToggleButton.option">
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="14,6" />
+    <Setter Property="MinWidth" Value="64" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
 
   <!-- Selectable chips (date presets) -->

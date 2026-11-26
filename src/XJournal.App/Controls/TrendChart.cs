@@ -7,9 +7,9 @@ using Avalonia.Media;
 namespace XJournal.App.Controls;
 
 /// <summary>One answer on the chart. <see cref="Reworded"/> marks the first answer to a new wording.</summary>
-public sealed record TrendPoint(DateOnly Day, int Value, string ValueLabel, string Wording, bool Reworded, long? EntryId);
+public sealed record TrendPoint(DateOnly Day, double Value, string ValueLabel, string Wording, bool Reworded, long? EntryId);
 
-/// <summary>A lightweight 1–5 line chart over a date range, with hover details and wording-change markers.</summary>
+/// <summary>A lightweight line chart of answers over a date range, with hover details and wording-change markers.</summary>
 public sealed class TrendChart : Control
 {
     public static readonly StyledProperty<IReadOnlyList<TrendPoint>?> PointsProperty =
@@ -21,13 +21,23 @@ public sealed class TrendChart : Control
     public static readonly StyledProperty<DateOnly> ToProperty =
         AvaloniaProperty.Register<TrendChart, DateOnly>(nameof(To));
 
-    private const double Left = 34, Right = 16, Top = 22, Bottom = 30, DotRadius = 4;
+    /// <summary>Bottom and top of the value axis.</summary>
+    public static readonly StyledProperty<double> MinimumProperty =
+        AvaloniaProperty.Register<TrendChart, double>(nameof(Minimum), 1);
+
+    public static readonly StyledProperty<double> MaximumProperty =
+        AvaloniaProperty.Register<TrendChart, double>(nameof(Maximum), 5);
+
+    private const double Left = 44, Right = 16, Top = 22, Bottom = 30, DotRadius = 4;
     private int _hover = -1;
 
     static TrendChart()
     {
-        AffectsRender<TrendChart>(PointsProperty, FromProperty, ToProperty);
+        AffectsRender<TrendChart>(PointsProperty, FromProperty, ToProperty, MinimumProperty, MaximumProperty);
     }
+
+    public double Minimum { get => GetValue(MinimumProperty); set => SetValue(MinimumProperty, value); }
+    public double Maximum { get => GetValue(MaximumProperty); set => SetValue(MaximumProperty, value); }
 
     public TrendChart()
     {
@@ -57,7 +67,18 @@ public sealed class TrendChart : Control
         return Plot.Left + Plot.Width * (day.DayNumber - From.DayNumber) / span;
     }
 
-    private double Y(int value) => Plot.Bottom - Plot.Height * (value - 1) / 4.0;
+    private double Y(double value) => Plot.Bottom - Plot.Height * (value - Minimum) / Math.Max(1e-9, Maximum - Minimum);
+
+    /// <summary>Distance between grid lines: every whole number for short ranges, otherwise 1, 2 or 5 × a power of ten.</summary>
+    internal static double TickStep(double range)
+    {
+        if (range <= 10) return 1;
+        var raw = range / 5;
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(raw)));
+        foreach (var step in new[] { 1, 2, 5, 10 })
+            if (step * magnitude >= raw) return step * magnitude;
+        return 10 * magnitude;
+    }
 
     private IBrush Brush(string key, IBrush fallback) =>
         this.TryFindResource(key, ActualThemeVariant, out var value) && value is IBrush brush ? brush : fallback;
@@ -73,13 +94,14 @@ public sealed class TrendChart : Control
         var typeface = new Typeface(FontFamily.Default);
         var plot = Plot;
 
-        // Horizontal grid lines and 1–5 labels.
-        for (var v = 1; v <= 5; v++)
+        // Horizontal grid lines and value labels.
+        var tick = TickStep(Maximum - Minimum);
+        for (var v = Minimum; v <= Maximum + tick / 1000; v += tick)
         {
             var y = Y(v);
             context.DrawLine(grid, new Point(plot.Left, y), new Point(plot.Right, y));
-            var label = Text(v.ToString(CultureInfo.CurrentCulture), 12, text, typeface);
-            context.DrawText(label, new Point(Left - 14 - label.Width / 2, y - label.Height / 2));
+            var label = Text(v.ToString("#,0.##", CultureInfo.CurrentCulture), 12, text, typeface);
+            context.DrawText(label, new Point(Left - 8 - label.Width, y - label.Height / 2));
         }
 
         // Date labels.
@@ -130,7 +152,7 @@ public sealed class TrendChart : Control
     {
         const double pad = 10, width = 260;
         var title = Text($"{p.Day:ddd, MMM d, yyyy}", 12, secondary, typeface);
-        var value = Text($"{p.Value} · {p.ValueLabel}", 14, primary, new Typeface(FontFamily.Default, weight: FontWeight.SemiBold));
+        var value = Text(p.ValueLabel, 14, primary, new Typeface(FontFamily.Default, weight: FontWeight.SemiBold));
         var wording = Text($"“{p.Wording}”", 12, secondary, typeface, width - pad * 2);
         var height = pad * 2 + title.Height + value.Height + wording.Height + 8;
 

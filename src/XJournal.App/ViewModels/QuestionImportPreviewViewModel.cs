@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using XJournal.Core;
+using XJournal.Core.Models;
 using XJournal.Core.Questions;
 
 namespace XJournal.App.ViewModels;
@@ -49,7 +50,7 @@ public sealed partial class QuestionImportPreviewViewModel : ViewModelBase
     private void Rebuild()
     {
         Added = Plan.Questions.Where(q => q.Change == QuestionChange.Added)
-            .Select(q => new PreviewLine(q.Question.Text)).ToList();
+            .Select(q => new PreviewLine(q.Question.Text, QuestionTypes.Describe(q.Question.Type, q.Question.Config))).ToList();
         Changed = Plan.Questions.Where(q => q.Change == QuestionChange.Changed)
             .Select(q => new PreviewLine(q.Question.Text, ChangeDetail(q))).ToList();
         Archived = Plan.ToArchive.Select(q => new PreviewLine(q.Current.Text)).ToList();
@@ -77,7 +78,9 @@ public sealed partial class QuestionImportPreviewViewModel : ViewModelBase
         var previous = q.Previous!;
         var parts = new List<string>();
         if (previous.Text != q.Question.Text) parts.Add($"was: “{previous.Text}”");
-        if (!previous.Scale.SequenceEqual(q.Question.Scale)) parts.Add($"scale now: {string.Join(" / ", q.Question.Scale)}");
+        var before = QuestionTypes.Describe(previous.Type, previous.Config);
+        var after = QuestionTypes.Describe(q.Question.Type, q.Question.Config);
+        if (before != after) parts.Add($"now: {after}");
         return string.Join("\n", parts);
     }
 }

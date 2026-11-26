@@ -14,10 +14,21 @@ public sealed class BarChart : Control
     public static readonly StyledProperty<IReadOnlyList<BarPoint>?> BarsProperty =
         AvaloniaProperty.Register<BarChart, IReadOnlyList<BarPoint>?>(nameof(Bars));
 
+    /// <summary>A fixed top of the axis (e.g. 100 for percentages); 0 picks a tidy value from the data.</summary>
+    public static readonly StyledProperty<double> MaximumProperty =
+        AvaloniaProperty.Register<BarChart, double>(nameof(Maximum));
+
+    /// <summary>Format for axis values, e.g. "N0" or "0'%'".</summary>
+    public static readonly StyledProperty<string> ValueFormatProperty =
+        AvaloniaProperty.Register<BarChart, string>(nameof(ValueFormat), "N0");
+
+    public static readonly StyledProperty<string> EmptyTextProperty =
+        AvaloniaProperty.Register<BarChart, string>(nameof(EmptyText), "Nothing written in this period yet");
+
     private const double Left = 44, Right = 8, Top = 12, Bottom = 26;
     private int _hover = -1;
 
-    static BarChart() => AffectsRender<BarChart>(BarsProperty);
+    static BarChart() => AffectsRender<BarChart>(BarsProperty, MaximumProperty, ValueFormatProperty, EmptyTextProperty);
 
     public BarChart()
     {
@@ -26,6 +37,9 @@ public sealed class BarChart : Control
     }
 
     public IReadOnlyList<BarPoint>? Bars { get => GetValue(BarsProperty); set => SetValue(BarsProperty, value); }
+    public double Maximum { get => GetValue(MaximumProperty); set => SetValue(MaximumProperty, value); }
+    public string ValueFormat { get => GetValue(ValueFormatProperty); set => SetValue(ValueFormatProperty, value); }
+    public string EmptyText { get => GetValue(EmptyTextProperty); set => SetValue(EmptyTextProperty, value); }
 
     private Rect Plot => new(Left, Top, Math.Max(1, Bounds.Width - Left - Right), Math.Max(1, Bounds.Height - Top - Bottom));
 
@@ -51,11 +65,11 @@ public sealed class BarChart : Control
         var grid = new Pen(Brush("DividerStrokeColorDefaultBrush", Brushes.LightGray), 1);
         var accent = Brush("AccentFillColorDefaultBrush", Brushes.DodgerBlue);
         var accentHover = Brush("AccentFillColorSecondaryBrush", accent);
-        var max = NiceMax(bars.Count == 0 ? 0 : bars.Max(b => b.Value));
-        if (bars.Count == 0 || max == 0)
+        var max = Maximum > 0 ? Maximum : NiceMax(bars.Count == 0 ? 0 : bars.Max(b => b.Value));
+        if (bars.Count == 0 || bars.All(b => b.Value <= 0))
         {
             context.DrawLine(grid, new Point(plot.Left, plot.Bottom), new Point(plot.Right, plot.Bottom));
-            var empty = Text("Nothing written in this period yet", 14, text);
+            var empty = Text(EmptyText, 14, text);
             context.DrawText(empty, new Point(plot.Center.X - empty.Width / 2, plot.Center.Y - empty.Height / 2));
             return;
         }
@@ -65,7 +79,7 @@ public sealed class BarChart : Control
             var value = max * i / 2;
             var y = plot.Bottom - plot.Height * i / 2;
             context.DrawLine(grid, new Point(plot.Left, y), new Point(plot.Right, y));
-            var label = Text(value.ToString("N0", CultureInfo.CurrentCulture), 11, text);
+            var label = Text(value.ToString(ValueFormat, CultureInfo.CurrentCulture), 11, text);
             context.DrawText(label, new Point(Left - 8 - label.Width, y - label.Height / 2));
         }
 
@@ -73,7 +87,7 @@ public sealed class BarChart : Control
         for (var i = 0; i < bars.Count; i++)
         {
             var (x, width) = Slot(i, bars.Count);
-            var height = plot.Height * bars[i].Value / max;
+            var height = plot.Height * Math.Min(bars[i].Value, max) / max;
             if (height > 0)
                 context.DrawRectangle(i == _hover ? accentHover : accent, null,
                     new Rect(x, plot.Bottom - height, width, height), 3, 3);

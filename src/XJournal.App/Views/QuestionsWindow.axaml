@@ -36,7 +36,7 @@
       </Button>
     </Grid>
 
-    <!-- Questions -->
+    <!-- Questions: a card per question; the answer area depends on the question's type -->
     <ScrollViewer Grid.Row="2" Padding="24,0,24,12" IsVisible="{Binding HasQuestions}">
       <ItemsControl ItemsSource="{Binding Items}">
         <ItemsControl.ItemsPanel>
@@ -48,25 +48,86 @@
           <DataTemplate x:DataType="vm:QuestionItemViewModel">
             <Border Classes="card">
               <StackPanel Spacing="12">
-                <TextBlock Text="{Binding Text}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <ItemsControl ItemsSource="{Binding Choices}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <UniformGrid Columns="5" Margin="-3,0" />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ChoiceViewModel">
-                      <RadioButton Classes="choice" Margin="3,0" GroupName="{Binding Group}" Tag="{Binding Number}"
-                                   Content="{Binding Label}" IsChecked="{Binding IsSelected}"
-                                   ToolTip.Tip="{Binding Label}" />
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding Text}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <HyperlinkButton Grid.Column="1" Content="Clear" Padding="8,0,0,0" VerticalAlignment="Top"
+                                   FontSize="12" Command="{Binding ClearCommand}" IsVisible="{Binding IsAnswered}"
+                                   ToolTip.Tip="Remove today's answer to this question" />
+                </Grid>
+                <ContentControl Content="{Binding}" />
               </StackPanel>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
+        <ItemsControl.DataTemplates>
+          <!-- Most specific types first: the first template that fits is used. -->
+          <DataTemplate x:DataType="vm:ScaleItemViewModel">
+            <StackPanel Spacing="4">
+              <ItemsControl ItemsSource="{Binding Options}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <UniformGrid Rows="1" Margin="-3,0" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:OptionViewModel">
+                    <RadioButton Classes="choice compact" Margin="3,0" Tag="{Binding Tag}" IsChecked="{Binding IsSelected}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Grid ColumnDefinitions="*,*" IsVisible="{Binding HasEndLabels}">
+                <TextBlock Classes="caption" Text="{Binding Low}" />
+                <TextBlock Grid.Column="1" Classes="caption" Text="{Binding High}" HorizontalAlignment="Right" />
+              </Grid>
+            </StackPanel>
+          </DataTemplate>
+          <DataTemplate x:DataType="vm:ChoiceItemViewModel">
+            <StackPanel Spacing="6">
+              <ItemsControl ItemsSource="{Binding Options}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:OptionViewModel">
+                    <ToggleButton Classes="option" Content="{Binding Tag}" IsChecked="{Binding IsSelected}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="caption" Text="{Binding Hint}"
+                         IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </DataTemplate>
+          <DataTemplate x:DataType="vm:PickItemViewModel">
+            <ItemsControl ItemsSource="{Binding Options}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Rows="1" Margin="-3,0" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:OptionViewModel">
+                  <RadioButton Classes="choice" Classes.compact="{Binding !HasLabel}" Margin="3,0" Tag="{Binding Tag}"
+                               Content="{Binding Label}" IsChecked="{Binding IsSelected}" ToolTip.Tip="{Binding Label}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DataTemplate>
+          <DataTemplate x:DataType="vm:NumberItemViewModel">
+            <StackPanel Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBox Width="160" Text="{Binding Input}" PlaceholderText="e.g. 7.5" />
+                <TextBlock Classes="secondary" VerticalAlignment="Center" Text="{Binding Unit}" />
+              </StackPanel>
+              <TextBlock Classes="error" Text="{Binding Error}"
+                         IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </DataTemplate>
+          <DataTemplate x:DataType="vm:TextItemViewModel">
+            <TextBox Text="{Binding Input}" MaxLength="{Binding MaxLength}" PlaceholderText="A short sentence…" />
+          </DataTemplate>
+        </ItemsControl.DataTemplates>
       </ItemsControl>
     </ScrollViewer>
 

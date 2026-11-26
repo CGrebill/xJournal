@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Dapper;
 using XJournal.Core.Models;
 
@@ -7,7 +6,7 @@ namespace XJournal.Core.Storage;
 public sealed class QuestionRepository(JournalDatabase db)
 {
     private const string VersionColumns =
-        "v.id, v.question_id, v.text, v.scale_json, v.content_hash, v.created_utc, v.created_offset";
+        "v.id, v.question_id, v.text, v.type, v.config_json, v.content_hash, v.created_utc, v.created_offset";
 
     /// <summary>Questions in display order. Archived questions are excluded unless requested.</summary>
     public IReadOnlyList<Question> GetAll(bool includeArchived = false) =>
@@ -45,14 +44,16 @@ public sealed class QuestionRepository(JournalDatabase db)
         public long Id { get; set; }
         public string QuestionId { get; set; } = "";
         public string Text { get; set; } = "";
-        public string ScaleJson { get; set; } = "[]";
+        public string Type { get; set; } = "";
+        public string ConfigJson { get; set; } = "{}";
         public string ContentHash { get; set; } = "";
         public long CreatedUtc { get; set; }
         public long CreatedOffset { get; set; }
 
         public QuestionVersion ToVersion() => new(
             Id, QuestionId, Text,
-            JsonSerializer.Deserialize<string[]>(ScaleJson) ?? [],
+            QuestionTypes.TryParse(Type, out var type) ? type : throw new JournalException($"Question \"{QuestionId}\" has an unknown type \"{Type}\"."),
+            QuestionConfig.FromJson(ConfigJson),
             ContentHash,
             DbTime.From(CreatedUtc, CreatedOffset));
     }

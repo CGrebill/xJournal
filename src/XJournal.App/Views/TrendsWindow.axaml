@@ -74,7 +74,23 @@
         <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
           <TextBlock Classes="subtitle" TextWrapping="Wrap" Text="{Binding SelectedQuestion.Text, FallbackValue=''}" />
           <TextBlock Grid.Row="1" Classes="secondary" Margin="0,4,0,12" Text="{Binding Stats}" />
-          <c:TrendChart Grid.Row="2" Name="Chart" Points="{Binding Points}" From="{Binding From}" To="{Binding To}" />
+          <!-- Line (ratings, scales, numbers), bars (yes/no, choice) or a list (text), depending on the question type -->
+          <c:TrendChart Grid.Row="2" Name="Chart" IsVisible="{Binding IsLine}" Points="{Binding Points}"
+                        From="{Binding From}" To="{Binding To}"
+                        Minimum="{Binding ChartMinimum}" Maximum="{Binding ChartMaximum}" />
+          <c:BarChart Grid.Row="2" IsVisible="{Binding IsBars}" Bars="{Binding AnswerBars}" Maximum="{Binding BarsMaximum}"
+                      ValueFormat="{Binding BarsFormat}" EmptyText="{Binding BarsEmptyText}" />
+          <ListBox Grid.Row="2" Classes="results" IsVisible="{Binding IsList}" ItemsSource="{Binding TextAnswers}"
+                   Name="TextAnswerList">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:TextAnswer">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="caption" Text="{Binding DateText}" />
+                  <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
           <ItemsControl Grid.Row="3" Margin="0,12,0,0" ItemsSource="{Binding Legend}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
