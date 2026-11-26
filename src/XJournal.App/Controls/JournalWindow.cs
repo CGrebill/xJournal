@@ -1,0 +1,49 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
+
+namespace XJournal.App.Controls;
+
+/// <summary>
+/// Base window: draws content into the title bar and asks for Mica (Windows 11), then acrylic,
+/// falling back to a solid theme background where the platform has neither.
+/// </summary>
+public class JournalWindow : Window
+{
+    public const double TitleBarHeight = 36;
+
+    protected override Type StyleKeyOverride => typeof(Window);
+
+    public JournalWindow()
+    {
+        Background = Brushes.Transparent;
+        TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.None];
+        ExtendClientAreaToDecorationsHint = true;
+        ExtendClientAreaTitleBarHeightHint = TitleBarHeight;
+        Classes.Add("journal");
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == ActualTransparencyLevelProperty || change.Property == ActualThemeVariantProperty)
+            UpdateBackdrop();
+    }
+
+    /// <summary>With no system backdrop, paint the theme's base background so content stays readable.</summary>
+    private void UpdateBackdrop()
+    {
+        var hasBackdrop = ActualTransparencyLevel != WindowTransparencyLevel.None;
+        Classes.Set("backdrop", hasBackdrop);
+        if (!this.TryFindResource("SolidBackgroundFillColorBaseBrush", ActualThemeVariant, out var resource) || resource is not IBrush solid)
+            return;
+        TransparencyBackgroundFallback = solid;
+        Background = hasBackdrop ? Brushes.Transparent : solid;
+    }
+
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        UpdateBackdrop();
+    }
+}

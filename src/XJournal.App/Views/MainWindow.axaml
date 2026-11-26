@@ -1,0 +1,196 @@
+<c:JournalWindow xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:c="using:XJournal.App.Controls"
+                 xmlns:vm="using:XJournal.App.ViewModels"
+                 xmlns:fa="using:FluentAvalonia.UI.Controls"
+                 x:Class="XJournal.App.Views.MainWindow"
+                 x:DataType="vm:MainViewModel"
+                 Title="xJournal"
+                 Width="1120" Height="740" MinWidth="880" MinHeight="580"
+                 WindowStartupLocation="CenterScreen">
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+N" Command="{Binding NewEntryCommand}" />
+    <KeyBinding Gesture="Ctrl+F" Command="{Binding ToggleSearchCommand}" />
+    <KeyBinding Gesture="Ctrl+Q" Command="{Binding OpenQuestionsCommand}" />
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveNowCommand}" />
+  </Window.KeyBindings>
+
+  <Grid RowDefinitions="36,*">
+    <StackPanel Orientation="Horizontal" Margin="16,0" Spacing="6" IsHitTestVisible="False">
+      <TextBlock Classes="app-title" Text="xJournal" FontWeight="SemiBold" />
+      <TextBlock Classes="app-title" Text="·" />
+      <TextBlock Classes="app-title" Text="{Binding Username}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" Margin="16,4,16,16" ColumnDefinitions="*,16,210" RowDefinitions="Auto,12,*">
+
+      <!-- Top row: date & time, summary -->
+      <Grid ColumnDefinitions="230,12,*">
+        <Border Classes="card" Padding="16,12">
+          <StackPanel Spacing="1">
+            <TextBlock Text="{Binding ClockTime}" FontSize="26" FontWeight="SemiBold" />
+            <TextBlock Classes="secondary" Text="{Binding ClockDate}" />
+            <TextBlock Classes="caption" Margin="0,6,0,0" Text="{Binding EntryStamp}"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="2" Classes="card" Padding="16,12">
+          <StackPanel VerticalAlignment="Center" Spacing="4">
+            <TextBlock Classes="caption" Text="Summary" />
+            <TextBox Classes="bare" Name="SummaryBox" Text="{Binding Summary}" FontSize="18"
+                     MaxLength="200" PlaceholderText="A one-line summary or tagline for this entry…" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <!-- Top right: today's check-in -->
+      <Button Grid.Column="2" Classes="tile" Command="{Binding OpenQuestionsCommand}"
+              ToolTip.Tip="Answer today's questions (Ctrl+Q)">
+        <Grid ColumnDefinitions="Auto,*">
+          <fa:FASymbolIcon Symbol="CalendarToday" FontSize="20" VerticalAlignment="Center" />
+          <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="1" VerticalAlignment="Center">
+            <TextBlock Text="Answer questions" FontWeight="SemiBold" />
+            <TextBlock Classes="caption" Text="Today's check-in" />
+          </StackPanel>
+          <fa:FAInfoBadge Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top"
+                          Width="8" Height="8" MinWidth="8" Margin="0,-6,-6,0" IsVisible="{Binding ShowQuestionBadge}"
+                          ToolTip.Tip="Not answered yet today" />
+        </Grid>
+      </Button>
+
+      <!-- Main area: editor, or search -->
+      <Grid Grid.Row="2" RowDefinitions="Auto,*">
+        <fa:FAInfoBar Severity="Informational" Margin="0,0,0,12"
+                      Title="Today's check-in" Message="You haven't answered today's questions yet."
+                      IsOpen="{Binding ShowReminder}" IsClosable="True"
+                      CloseButtonCommand="{Binding DismissReminderCommand}">
+          <fa:FAInfoBar.ActionButton>
+            <Button Content="Answer now" Command="{Binding OpenQuestionsCommand}" />
+          </fa:FAInfoBar.ActionButton>
+        </fa:FAInfoBar>
+
+        <Border Grid.Row="1" Classes="card" Padding="0" IsVisible="{Binding !IsSearchOpen}">
+          <Grid RowDefinitions="*,Auto">
+            <TextBox Classes="bare editor" Name="Editor" Text="{Binding Body}" Margin="24,20,24,8"
+                     PlaceholderText="Write whatever's on your mind. It saves itself." />
+            <Border Grid.Row="1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,0,0" Padding="16,6,8,6">
+              <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding WordCount}" />
+                <TextBlock Grid.Column="1" Classes="caption" VerticalAlignment="Center" Margin="16,0,0,0"
+                           Text="{Binding SaveStatus}" />
+                <Border Grid.Column="3" CornerRadius="10" Padding="8,2" Margin="0,0,8,0"
+                        VerticalAlignment="Center" IsVisible="{Binding IsPastEntry}"
+                        Background="{DynamicResource SystemFillColorAttentionBackgroundBrush}">
+                  <TextBlock Classes="caption" Text="Past entry" />
+                </Border>
+                <Button Grid.Column="4" Classes="subtle" Padding="8,4" ToolTip.Tip="More">
+                  <fa:FASymbolIcon Symbol="More" FontSize="14" />
+                  <Button.Flyout>
+                    <MenuFlyout Placement="TopEdgeAlignedRight">
+                      <MenuItem Header="New entry" InputGesture="Ctrl+N" Command="{Binding NewEntryCommand}" />
+                      <MenuItem Header="Delete this entry…" Command="{Binding DeleteEntryCommand}" />
+                    </MenuFlyout>
+                  </Button.Flyout>
+                </Button>
+              </Grid>
+            </Border>
+          </Grid>
+        </Border>
+
+        <Panel Grid.Row="1" IsVisible="{Binding IsSearchOpen}">
+        <Border Classes="card" Padding="20,16" DataContext="{Binding Search}" x:DataType="vm:SearchViewModel">
+          <Grid RowDefinitions="Auto,Auto,Auto,*">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Name="SearchBox" Text="{Binding Query}" FontSize="16"
+                       PlaceholderText="Search your journal — words, or &quot;an exact phrase&quot;">
+                <TextBox.InnerLeftContent>
+                  <fa:FASymbolIcon Symbol="Find" FontSize="16" Margin="10,0,0,0" />
+                </TextBox.InnerLeftContent>
+              </TextBox>
+              <Button Grid.Column="1" Margin="8,0,0,0" Name="CloseSearchButton" ToolTip.Tip="Close search (Esc)">
+                <fa:FASymbolIcon Symbol="Dismiss" FontSize="14" />
+              </Button>
+            </Grid>
+
+            <WrapPanel Grid.Row="1" Margin="0,12,0,0" ItemSpacing="6" LineSpacing="6">
+              <Button Classes="chip" Content="Any time" Command="{Binding PresetCommand}" CommandParameter="all" />
+              <Button Classes="chip" Content="Today" Command="{Binding PresetCommand}" CommandParameter="today" />
+              <Button Classes="chip" Content="Past 7 days" Command="{Binding PresetCommand}" CommandParameter="week" />
+              <Button Classes="chip" Content="Past 30 days" Command="{Binding PresetCommand}" CommandParameter="month" />
+              <Button Classes="chip" Content="Past year" Command="{Binding PresetCommand}" CommandParameter="year" />
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,0,0,0">
+                <TextBlock Classes="caption" Text="From" VerticalAlignment="Center" />
+                <CalendarDatePicker SelectedDate="{Binding FromDate}" Width="140" />
+                <TextBlock Classes="caption" Text="to" VerticalAlignment="Center" />
+                <CalendarDatePicker SelectedDate="{Binding ToDate}" Width="140" />
+              </StackPanel>
+            </WrapPanel>
+
+            <TextBlock Grid.Row="2" Classes="caption" Margin="2,14,0,6" Text="{Binding ResultSummary}" />
+
+            <ListBox Grid.Row="3" Classes="results" Name="ResultsList" ItemsSource="{Binding Results}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:SearchResultItem">
+                  <Grid ColumnDefinitions="150,*">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="{Binding DateText}" FontWeight="SemiBold" />
+                      <TextBlock Classes="caption" Text="{Binding TimeText}" />
+                      <TextBlock Classes="caption" Text="Open now" IsVisible="{Binding IsCurrent}"
+                                 Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                      <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" IsVisible="{Binding HasSummary}"
+                                 TextTrimming="CharacterEllipsis" />
+                      <c:HighlightTextBlock MarkedText="{Binding Snippet}" TextWrapping="Wrap" MaxLines="2"
+                                            TextTrimming="CharacterEllipsis"
+                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Grid>
+        </Border>
+        </Panel>
+      </Grid>
+
+      <!-- Right column -->
+      <Grid Grid.Row="2" Grid.Column="2" RowDefinitions="96,12,96,*,Auto">
+        <Button Classes="tile accent" Command="{Binding NewEntryCommand}" ToolTip.Tip="Start a new entry (Ctrl+N)">
+          <StackPanel Spacing="6">
+            <fa:FASymbolIcon Symbol="Add" FontSize="22" HorizontalAlignment="Left" />
+            <TextBlock Text="New entry" FontWeight="SemiBold" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Row="2" Classes="tile" Command="{Binding ToggleSearchCommand}" ToolTip.Tip="Search entries (Ctrl+F)">
+          <StackPanel Spacing="6">
+            <fa:FASymbolIcon Symbol="Find" FontSize="22" HorizontalAlignment="Left" />
+            <TextBlock Text="Search entries" FontWeight="SemiBold" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Row="4" Spacing="6">
+          <Button Classes="tile" Height="44" Command="{Binding OpenTrendsCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <fa:FASymbolIcon Symbol="CalendarMonth" FontSize="16" />
+              <TextBlock Text="Trends" />
+            </StackPanel>
+          </Button>
+          <Button Classes="tile" Height="44" Command="{Binding OpenSettingsCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <fa:FASymbolIcon Symbol="Settings" FontSize="16" />
+              <TextBlock Text="Settings &amp; backup" />
+            </StackPanel>
+          </Button>
+          <Button Classes="tile" Height="44" Command="{Binding SignOutCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <fa:FASymbolIcon Symbol="Back" FontSize="16" />
+              <TextBlock Text="Sign out" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Grid>
+</c:JournalWindow>

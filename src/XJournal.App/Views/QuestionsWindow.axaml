@@ -1,0 +1,98 @@
+<c:JournalWindow xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:c="using:XJournal.App.Controls"
+                 xmlns:vm="using:XJournal.App.ViewModels"
+                 xmlns:fa="using:FluentAvalonia.UI.Controls"
+                 x:Class="XJournal.App.Views.QuestionsWindow"
+                 x:DataType="vm:QuestionsViewModel"
+                 Title="Today's check-in · xJournal"
+                 Width="680" Height="760" MinWidth="520" MinHeight="420"
+                 WindowStartupLocation="CenterOwner">
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding $parent[Window].Close}" />
+  </Window.KeyBindings>
+
+  <Grid RowDefinitions="36,Auto,*,Auto">
+    <TextBlock Classes="app-title" Margin="16,0" Text="Today's check-in" IsHitTestVisible="False" />
+
+    <Grid Grid.Row="1" Margin="24,8,24,12" ColumnDefinitions="*,Auto">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="title" Text="How was today?" />
+        <TextBlock Classes="secondary" Text="{Binding DateText}" />
+      </StackPanel>
+      <Button Grid.Column="1" VerticalAlignment="Center" ToolTip.Tip="Question options">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <fa:FASymbolIcon Symbol="Edit" FontSize="14" />
+          <TextBlock Text="Questions" />
+        </StackPanel>
+        <Button.Flyout>
+          <MenuFlyout Placement="BottomEdgeAlignedRight">
+            <MenuItem Header="Import questions…" Command="{Binding ImportQuestionsCommand}" />
+            <MenuItem Header="Export current questions…" Command="{Binding ExportQuestionsCommand}" />
+            <Separator />
+            <MenuItem Header="Save a sample question file…" Command="{Binding SaveSampleCommand}" />
+          </MenuFlyout>
+        </Button.Flyout>
+      </Button>
+    </Grid>
+
+    <!-- Questions -->
+    <ScrollViewer Grid.Row="2" Padding="24,0,24,12" IsVisible="{Binding HasQuestions}">
+      <ItemsControl ItemsSource="{Binding Items}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="10" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:QuestionItemViewModel">
+            <Border Classes="card">
+              <StackPanel Spacing="12">
+                <TextBlock Text="{Binding Text}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding Choices}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Columns="5" Margin="-3,0" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChoiceViewModel">
+                      <RadioButton Classes="choice" Margin="3,0" GroupName="{Binding Group}" Tag="{Binding Number}"
+                                   Content="{Binding Label}" IsChecked="{Binding IsSelected}"
+                                   ToolTip.Tip="{Binding Label}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Empty state -->
+    <Border Grid.Row="2" Classes="card" Margin="24,0,24,24" Padding="32" VerticalAlignment="Top"
+            IsVisible="{Binding !HasQuestions}">
+      <StackPanel Spacing="12">
+        <fa:FASymbolIcon Symbol="CalendarToday" FontSize="32" HorizontalAlignment="Left" />
+        <TextBlock Classes="subtitle" Text="No questions yet" />
+        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                   Text="Questions come from a JSON file, so you can write your own and change them over time. Start from the sample file, edit it in any text editor, then import it." />
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+          <Button Classes="accent" Content="Import questions…" Command="{Binding ImportQuestionsCommand}" />
+          <Button Content="Save sample file…" Command="{Binding SaveSampleCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="3" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0"
+            Padding="24,10">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding Progress}" />
+        <TextBlock Grid.Column="1" Classes="caption" VerticalAlignment="Center" Margin="16,0" Text="{Binding Status}" />
+        <Button Grid.Column="2" Classes="accent" Content="Done" MinWidth="96"
+                Command="{Binding $parent[Window].Close}" />
+      </Grid>
+    </Border>
+  </Grid>
+</c:JournalWindow>

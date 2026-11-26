@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:XJournal.App.ViewModels"
+             xmlns:fa="using:FluentAvalonia.UI.Controls"
+             x:Class="XJournal.App.Views.ImportJournalView"
+             x:DataType="vm:ImportJournalViewModel"
+             Width="440">
+  <StackPanel Spacing="14">
+    <StackPanel Spacing="2">
+      <TextBlock Classes="caption" Text="File" />
+      <TextBlock Classes="body-strong" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+    </StackPanel>
+
+    <StackPanel Spacing="6" IsVisible="{Binding IsBackup}">
+      <TextBlock Text="Backup password" />
+      <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding !IsUnlocked}">
+        <TextBox Text="{Binding BackupPassword}" PasswordChar="●" Classes="revealPasswordButton"
+                 PlaceholderText="The password the backup was made with" />
+        <Button Grid.Column="1" Margin="8,0,0,0" Content="Unlock" Command="{Binding UnlockCommand}" />
+      </Grid>
+    </StackPanel>
+
+    <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding IsJson}"
+               Text="This is a readable, unencrypted export. It will be encrypted with the password you choose below." />
+
+    <Border Classes="layer" Padding="12" IsVisible="{Binding IsUnlocked}">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <fa:FASymbolIcon Symbol="Checkmark" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+        <TextBlock Text="{Binding SummaryText}" TextWrapping="Wrap" MaxWidth="370" />
+      </StackPanel>
+    </Border>
+
+    <Separator />
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Import as account" />
+      <TextBox Text="{Binding TargetUsername}" PlaceholderText="Username" />
+      <CheckBox IsChecked="{Binding ReplaceExisting}" IsVisible="{Binding TargetExists}">
+        <TextBlock TextWrapping="Wrap"
+                   Text="This account already exists on this computer. Replace it (a copy of the current journal is kept)." />
+      </CheckBox>
+    </StackPanel>
+
+    <CheckBox IsChecked="{Binding UseNewPassword}" IsVisible="{Binding IsBackup}"
+              Content="Use a different password on this computer" />
+
+    <StackPanel Spacing="6" IsVisible="{Binding UseNewPassword}">
+      <TextBlock Text="New password" />
+      <TextBox Text="{Binding NewPassword}" PasswordChar="●" Classes="revealPasswordButton" />
+      <TextBox Text="{Binding ConfirmNewPassword}" PasswordChar="●" Classes="revealPasswordButton"
+               PlaceholderText="Confirm password" />
+    </StackPanel>
+
+    <TextBlock Classes="error" Text="{Binding Error}"
+               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </StackPanel>
+</UserControl>

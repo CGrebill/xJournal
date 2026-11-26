@@ -1,0 +1,159 @@
+<c:JournalWindow xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:c="using:XJournal.App.Controls"
+                 xmlns:vm="using:XJournal.App.ViewModels"
+                 xmlns:fa="using:FluentAvalonia.UI.Controls"
+                 x:Class="XJournal.App.Views.SettingsWindow"
+                 x:DataType="vm:SettingsViewModel"
+                 Title="Settings · xJournal"
+                 Width="760" Height="760" MinWidth="560" MinHeight="480"
+                 WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="2,18,0,6" />
+    </Style>
+    <Style Selector="Border.setting">
+      <Setter Property="Padding" Value="16,12" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="36,*">
+    <TextBlock Classes="app-title" Margin="16,0" Text="Settings" IsHitTestVisible="False" />
+
+    <ScrollViewer Grid.Row="1" Padding="24,0,24,24">
+      <StackPanel Spacing="4">
+        <TextBlock Classes="title" Text="Settings" Margin="0,8,0,0" />
+
+        <!-- Appearance & entries -->
+        <TextBlock Classes="section" Text="Writing" />
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <fa:FASymbolIcon Symbol="ColorBackground" FontSize="18" />
+            <StackPanel Grid.Column="1" Margin="14,0" Spacing="1">
+              <TextBlock Text="Theme" />
+              <TextBlock Classes="caption" Text="Light, dark, or follow Windows." />
+            </StackPanel>
+            <ComboBox Grid.Column="2" MinWidth="180" ItemsSource="{Binding Themes}" SelectedIndex="{Binding ThemeIndex}" />
+          </Grid>
+        </Border>
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <fa:FASymbolIcon Symbol="Clock" FontSize="18" />
+            <StackPanel Grid.Column="1" Margin="14,0" Spacing="1">
+              <TextBlock Text="Continue a recent entry" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="When you sign in, reopen your last entry if you edited it within this many minutes. Otherwise a new entry starts. 0 always starts fresh." />
+            </StackPanel>
+            <NumericUpDown Grid.Column="2" Width="130" VerticalAlignment="Center" Minimum="0" Maximum="1440" Increment="5"
+                           FormatString="0" Value="{Binding ResumeMinutes}" />
+          </Grid>
+        </Border>
+
+        <!-- Questions -->
+        <TextBlock Classes="section" Text="Check-in questions" />
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*">
+            <fa:FASymbolIcon Symbol="CalendarToday" FontSize="18" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="10">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Question file" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Import a JSON file to add, reword or retire questions. Past answers always keep the wording they were given for." />
+              </StackPanel>
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button Content="Import questions…" Command="{Binding ImportQuestionsCommand}" />
+                <Button Content="Export current questions…" Command="{Binding ExportQuestionsCommand}" />
+                <Button Content="Save sample file…" Command="{Binding SaveSampleQuestionsCommand}" />
+              </WrapPanel>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Backup -->
+        <TextBlock Classes="section" Text="Backup &amp; moving to another computer" />
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*">
+            <fa:FASymbolIcon Symbol="CloudBackup" FontSize="18" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="10">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Automatic backups" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding AutoBackupDescription}" />
+              </StackPanel>
+              <Border Classes="layer" Padding="10,6" IsVisible="{Binding HasAutoBackupFolder}">
+                <TextBlock Text="{Binding AutoBackupFolder}" TextTrimming="PathSegmentEllipsis" FontSize="13" />
+              </Border>
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" IsVisible="{Binding HasAutoBackupFolder}">
+                <TextBlock Text="Keep the newest" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Column="2" Width="120" Minimum="1" Maximum="365" FormatString="0"
+                               Value="{Binding AutoBackupKeep}" />
+                <TextBlock Grid.Column="3" Text="backups" VerticalAlignment="Center" Margin="8,0,0,0" />
+              </Grid>
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button Content="Choose folder…" Command="{Binding ChooseBackupFolderCommand}" />
+                <Button Content="Back up now" Command="{Binding BackUpNowCommand}" IsVisible="{Binding HasAutoBackupFolder}" />
+                <Button Content="Turn off" Command="{Binding TurnOffAutoBackupCommand}" IsVisible="{Binding HasAutoBackupFolder}" />
+              </WrapPanel>
+              <TextBlock Classes="caption" Text="{Binding BackupStatus}" TextWrapping="Wrap"
+                         IsVisible="{Binding BackupStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*">
+            <fa:FASymbolIcon Symbol="SaveAs" FontSize="18" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="10">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Export your journal" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="An encrypted backup holds everything (entries, questions, answers and settings). Carry it on a USB stick or upload it anywhere, then import it from the sign-in screen on another computer." />
+              </StackPanel>
+              <WrapPanel ItemSpacing="8" LineSpacing="8">
+                <Button Classes="accent" Content="Export encrypted backup…" Command="{Binding ExportBackupCommand}" />
+                <Button Content="Export readable copy (JSON)…" Command="{Binding ExportJsonCommand}" />
+              </WrapPanel>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Security -->
+        <TextBlock Classes="section" Text="Security" />
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*">
+            <fa:FASymbolIcon Symbol="ProtectedDocument" FontSize="18" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="10">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Change password" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Your journal is re-encrypted with the new password. Backups you already made still use the password they were made with." />
+              </StackPanel>
+              <TextBox Text="{Binding CurrentPassword}" PasswordChar="●" Classes="revealPasswordButton" PlaceholderText="Current password" MaxWidth="360" HorizontalAlignment="Left" Width="360" />
+              <TextBox Text="{Binding NewPassword}" PasswordChar="●" Classes="revealPasswordButton" PlaceholderText="New password" Width="360" HorizontalAlignment="Left" />
+              <TextBox Text="{Binding ConfirmPassword}" PasswordChar="●" Classes="revealPasswordButton" PlaceholderText="Confirm new password" Width="360" HorizontalAlignment="Left" />
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Change password" Command="{Binding ChangePasswordCommand}" />
+                <fa:FAProgressRing IsIndeterminate="True" Width="18" Height="18" IsVisible="{Binding IsChangingPassword}" />
+              </StackPanel>
+              <TextBlock Text="{Binding PasswordStatus}" TextWrapping="Wrap"
+                         Classes.error="{Binding PasswordStatusIsError}"
+                         IsVisible="{Binding PasswordStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Account -->
+        <TextBlock Classes="section" Text="Account" />
+        <Border Classes="card setting">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <fa:FASymbolIcon Symbol="Account" FontSize="18" />
+            <StackPanel Grid.Column="1" Margin="14,0" Spacing="1">
+              <TextBlock Text="{Binding Username}" />
+              <TextBlock Classes="caption" Text="{Binding JournalLocation}" TextTrimming="PathSegmentEllipsis" />
+            </StackPanel>
+            <Button Grid.Column="2" Content="Sign out" Command="{Binding SignOutCommand}" />
+          </Grid>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</c:JournalWindow>

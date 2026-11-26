@@ -1,0 +1,27 @@
+{
+  // xJournal question file.
+  // - "id" must never change for a question: answers are tracked by it.
+  //   Rewording a question (same id, new text) keeps its history; the old wording is remembered.
+  // - Leaving a question out of a later import archives it (its answers are kept).
+  // - "scale" lists the 5 answer labels from lowest (1) to highest (5). It can be set for the
+  //   whole file and overridden per question.
+  "version": 1,
+  "scale": [
+    "Entirely disagree",
+    "Somewhat disagree",
+    "Neither agree nor disagree",
+    "Somewhat agree",
+    "Entirely agree"
+  ],
+  "questions": [
+    { "id": "energy", "text": "I had plenty of energy today." },
+    { "id": "mood", "text": "My mood was generally good." },
+    { "id": "focus", "text": "I could focus when I needed to." },
+    { "id": "sleep", "text": "I slept well last night." },
+    {
+      "id": "stress",
+      "text": "How stressed did I feel?",
+      "scale": ["Not at all", "A little", "Moderately", "Very", "Extremely"]
+    }
+  ]
+}

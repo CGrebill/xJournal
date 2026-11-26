@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:XJournal.App.ViewModels"
+             x:Class="XJournal.App.Views.ExportBackupView"
+             x:DataType="vm:ExportBackupViewModel"
+             Width="420">
+  <StackPanel Spacing="12">
+    <TextBlock TextWrapping="Wrap"
+               Text="The backup is encrypted. By default it opens with your current password." />
+    <CheckBox IsChecked="{Binding UseSeparatePassword}" Content="Protect this backup with a different password" />
+    <StackPanel Spacing="6" IsVisible="{Binding UseSeparatePassword}">
+      <TextBox Text="{Binding Password}" PasswordChar="●" Classes="revealPasswordButton" PlaceholderText="Backup password" />
+      <TextBox Text="{Binding Confirm}" PasswordChar="●" Classes="revealPasswordButton" PlaceholderText="Confirm backup password" />
+      <TextBlock Classes="caption" TextWrapping="Wrap" Text="You'll need this password to import the backup. It can't be recovered." />
+    </StackPanel>
+    <TextBlock Classes="error" Text="{Binding Error}"
+               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </StackPanel>
+</UserControl>
