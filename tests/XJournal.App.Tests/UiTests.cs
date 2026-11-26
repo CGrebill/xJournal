@@ -76,7 +76,7 @@ public sealed class UiTests : IDisposable
 
         Journal? signedIn = null;
         vm.SignedIn += j => signedIn = j;
-        vm.Username = "caleb";
+        vm.Username = "jordan";
         vm.Password = "short";
         vm.ConfirmPassword = "short";
         await vm.SubmitCommand.ExecuteAsync(null);
@@ -90,7 +90,7 @@ public sealed class UiTests : IDisposable
 
         var again = new LoginViewModel(_accounts, new WindowDialogs(window));
         Assert.False(again.IsCreateMode);
-        Assert.Equal("caleb", again.Username);
+        Assert.Equal("jordan", again.Username);
         window.DataContext = again;
         Screenshot(window, "03-login-signin");
         window.Close();
@@ -99,7 +99,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public void Typing_in_the_editor_saves_automatically()
     {
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         var (window, vm) = OpenMain(journal);
         Assert.False(vm.Session.Current.IsPersisted);
         Screenshot(window, "04-main-empty");
@@ -132,7 +132,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public void Search_finds_and_opens_entries()
     {
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         var (window, vm) = OpenMain(journal);
         foreach (var (summary, body) in new[]
                  {
@@ -166,7 +166,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public void A_pending_search_after_signing_out_is_ignored()
     {
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         var (window, vm) = OpenMain(journal);
         vm.ToggleSearchCommand.Execute(null);
         vm.Search.Query = "anything"; // schedules a search
@@ -181,7 +181,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public void Idle_journal_signs_out_after_the_auto_lock_time()
     {
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         Assert.Equal(15, journal.Settings.AutoLockMinutes);
         var (window, vm) = OpenMain(journal);
         string? notice = null;
@@ -196,13 +196,13 @@ public sealed class UiTests : IDisposable
 
         Assert.Contains("15 minutes", notice);
         Assert.True(journal.IsDisposed);
-        using (var reopened = _accounts.SignIn("caleb", Password))
+        using (var reopened = _accounts.SignIn("jordan", Password))
         {
             Assert.Equal("Unsaved when the lock kicks in.", reopened.Entries.GetLatest()!.Body);
             reopened.Settings.AutoLockMinutes = 0;
         }
 
-        var again = _accounts.SignIn("caleb", Password);
+        var again = _accounts.SignIn("jordan", Password);
         var (window2, vm2) = OpenMain(again);
         Assert.False(vm2.CheckIdle(DateTimeOffset.Now.AddDays(1))); // 0 = never
         window2.Close();
@@ -231,7 +231,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public void Questions_window_saves_answers_and_clears_the_reminder()
     {
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         ImportSampleQuestions(journal);
         var (main, mainVm) = OpenMain(journal);
         Assert.True(mainVm.ShowReminder);
@@ -267,7 +267,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public void Trends_and_settings_render()
     {
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         ImportSampleQuestions(journal);
         var today = journal.Clock.Today();
         var mood = journal.Questions.Get("mood")!.Current.Id;
@@ -329,7 +329,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public async Task Merging_another_computers_journal_updates_the_open_entry()
     {
-        var home = _accounts.Create("caleb", Password);
+        var home = _accounts.Create("jordan", Password);
         var session = new XJournal.Core.Sessions.EntrySession(home);
         session.SetText("Shared", "Written at home.");
         session.Leave();
@@ -341,7 +341,7 @@ public sealed class UiTests : IDisposable
         var laptopAccounts = new AccountStore(Path.Combine(_root, "laptop"));
         var start = Path.Combine(_root, "start.xjbackup");
         XJournal.Core.Backup.JournalTransfer.ExportEncrypted(home, start);
-        using (var laptop = new XJournal.Core.Backup.JournalTransfer(laptopAccounts).ImportBackup(start, Password, "caleb", null, false))
+        using (var laptop = new XJournal.Core.Backup.JournalTransfer(laptopAccounts).ImportBackup(start, Password, "jordan", null, false))
         {
             Thread.Sleep(20);
             var other = new XJournal.Core.Sessions.EntrySession(laptop);
@@ -402,13 +402,13 @@ public sealed class UiTests : IDisposable
         foreach (var ago in daysAgo)
         {
             var store = new AccountStore(_root, new ShiftedClock(TimeSpan.FromDays(-ago)));
-            using var j = store.FindAccount("caleb") is null ? store.Create("caleb", Password) : store.SignIn("caleb", Password);
+            using var j = store.FindAccount("jordan") is null ? store.Create("jordan", Password) : store.SignIn("jordan", Password);
             var session = new XJournal.Core.Sessions.EntrySession(j);
             session.SetText("", string.Join(' ', Enumerable.Repeat("word", 40 + random.Next(260))));
             session.Leave();
         }
 
-        var journal = _accounts.SignIn("caleb", Password);
+        var journal = _accounts.SignIn("jordan", Password);
         var (main, mainVm) = OpenMain(journal);
         Assert.Equal("3-day streak", mainVm.StreakText);
         mainVm.Body = "Writing today extends it.";
@@ -433,7 +433,7 @@ public sealed class UiTests : IDisposable
     [AvaloniaFact]
     public void Calendar_shows_activity_and_opens_entries()
     {
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         ImportSampleQuestions(journal);
         journal.Answers.SaveForDay(journal.Clock.Today(), null,
             new Dictionary<long, int> { [journal.Questions.Get("mood")!.Current.Id] = 4 }, journal.Clock.Now);
@@ -476,14 +476,14 @@ public sealed class UiTests : IDisposable
         var lastYear = DateTimeOffset.Now.AddYears(-1);
         if (lastYear.Day != DateTimeOffset.Now.Day) return; // 29 February: no matching date last year
         var past = new AccountStore(_root, new ShiftedClock(lastYear - DateTimeOffset.Now));
-        using (var then = past.Create("caleb", Password))
+        using (var then = past.Create("jordan", Password))
         {
             var session = new XJournal.Core.Sessions.EntrySession(then);
             session.SetText("Last year's trip", "We drove to the coast.");
             session.Leave();
         }
 
-        var journal = _accounts.SignIn("caleb", Password);
+        var journal = _accounts.SignIn("jordan", Password);
         var (window, vm) = OpenMain(journal); // a year later: the old entry isn't resumed
         Assert.True(vm.ShowMemory);
         Assert.Equal("On this day · 1 year ago", vm.MemoryTitle);
@@ -505,7 +505,7 @@ public sealed class UiTests : IDisposable
         Assert.False(vm.ShowMemory);
         window.Close();
 
-        var (again, againVm) = OpenMain(_accounts.SignIn("caleb", Password));
+        var (again, againVm) = OpenMain(_accounts.SignIn("jordan", Password));
         Assert.False(againVm.ShowMemory); // dismissed for the rest of the day
         again.Close();
     }
@@ -523,6 +523,19 @@ public sealed class UiTests : IDisposable
         var dialog = Host(new MarkdownExportView { DataContext = options }, "Export entries as Markdown");
         Screenshot(dialog, "18-markdown-export");
         dialog.Close();
+    }
+
+    [AvaloniaFact]
+    public void Windows_draw_only_caption_buttons_in_the_title_bar()
+    {
+        // Our windows draw their own title text; a drawn system title on top of it was doubled (issue seen on Windows).
+        foreach (var window in new Window[] { new LoginWindow(), new MainWindow(), new SettingsWindow(), new QuestionsWindow(), new TrendsWindow() })
+        {
+            var parts = Avalonia.Controls.Chrome.WindowDrawnDecorations.GetTitleBarDecorations(window);
+            Assert.False(parts.HasFlag(Avalonia.Controls.Chrome.TitleBarDecorations.Title));
+            Assert.False(parts.HasFlag(Avalonia.Controls.Chrome.TitleBarDecorations.FullScreenButton));
+            Assert.True(parts.HasFlag(Avalonia.Controls.Chrome.TitleBarDecorations.CloseButton));
+        }
     }
 
     [AvaloniaFact]
@@ -553,7 +566,7 @@ public sealed class UiTests : IDisposable
     public void Dark_theme_renders()
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("XJOURNAL_SCREENSHOTS"))) return;
-        var journal = _accounts.Create("caleb", Password);
+        var journal = _accounts.Create("jordan", Password);
         ImportSampleQuestions(journal);
         AppShell.ApplyTheme("dark");
         try
@@ -599,7 +612,7 @@ public sealed class ShellTests : IDisposable
         shell.ShowLogin();
         var login = Assert.IsType<LoginWindow>(desktop.MainWindow);
         var loginVm = (LoginViewModel)login.DataContext!;
-        loginVm.Username = "caleb";
+        loginVm.Username = "jordan";
         loginVm.Password = loginVm.ConfirmPassword = "correct horse";
         await loginVm.SubmitCommand.ExecuteAsync(null);
         Dispatcher.UIThread.RunJobs();

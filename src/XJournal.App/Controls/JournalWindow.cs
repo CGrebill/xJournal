@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Chrome;
 using Avalonia.Media;
 using Avalonia.Platform;
 
@@ -12,6 +13,9 @@ namespace XJournal.App.Controls;
 public class JournalWindow : Window
 {
     public const double TitleBarHeight = 36;
+
+    public const TitleBarDecorations CaptionButtonsOnly =
+        TitleBarDecorations.MinimizeButton | TitleBarDecorations.MaximizeButton | TitleBarDecorations.CloseButton;
 
     private static readonly Lazy<WindowIcon> AppIcon =
         new(() => new WindowIcon(AssetLoader.Open(new Uri("avares://xJournal/Assets/xjournal.ico"))));
@@ -32,6 +36,10 @@ public class JournalWindow : Window
         TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.None];
         ExtendClientAreaToDecorationsHint = true;
         ExtendClientAreaTitleBarHeightHint = TitleBarHeight;
+        // Where Avalonia draws the title bar itself (e.g. Windows with an extended client area), it would
+        // also draw the window title (on top of our own title text) and a full-screen button.
+        // Keep just the standard caption buttons; the title still shows in the taskbar and Alt+Tab.
+        WindowDrawnDecorations.SetTitleBarDecorations(this, CaptionButtonsOnly);
         Classes.Add("journal");
         if (OperatingSystem.IsMacOS()) Classes.Add("macos");
         Icon = AppIcon.Value;
