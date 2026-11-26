@@ -1,0 +1,64 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem!
+        **Never attach real journal files (`.xjdb`), backups (`.xjbackup`), exports or passwords.** Issues are public.
+        Security problems should be reported privately: see [SECURITY.md](https://github.com/CGrebill/xJournal/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: xJournal version
+      description: Shown at the bottom of Settings.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Windows installer
+        - Windows portable zip
+        - macOS zip
+        - Linux tarball
+        - Built from source
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. …
+  - type: textarea
+    id: log
+    attributes:
+      label: Error log (optional)
+      description: |
+        If xJournal showed "Something went wrong", paste the matching part of the log from
+        `%APPDATA%\xJournal\logs` (Windows) or `~/.config/xJournal/logs` (Linux/macOS).
+        The log only has technical details, never journal text.
+      render: text

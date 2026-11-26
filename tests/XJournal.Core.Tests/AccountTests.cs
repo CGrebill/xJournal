@@ -5,8 +5,8 @@ namespace XJournal.Core.Tests;
 public class AccountTests
 {
     [Theory]
-    [InlineData("caleb", true)]
-    [InlineData("Caleb G-2_x.y", true)]
+    [InlineData("jordan", true)]
+    [InlineData("Jordan G-2_x.y", true)]
     [InlineData("", false)]
     [InlineData("   ", false)]
     [InlineData("a/b", false)]
@@ -29,14 +29,14 @@ public class AccountTests
     public void Accounts_are_listed_and_matched_case_insensitively()
     {
         using var env = new TestEnv();
-        env.CreateJournal("Caleb").Dispose();
+        env.CreateJournal("Jordan").Dispose();
         env.CreateJournal("alex").Dispose();
 
-        Assert.Equal(["alex", "Caleb"], env.Accounts.ListAccounts());
-        Assert.Throws<AccountException>(() => env.Accounts.Create("caleb", TestEnv.Password));
-        using var journal = env.Accounts.SignIn("CALEB", TestEnv.Password);
-        Assert.Equal("Caleb", journal.Username);
-        Assert.Equal("Caleb", env.Accounts.LastUsername);
+        Assert.Equal(["alex", "Jordan"], env.Accounts.ListAccounts());
+        Assert.Throws<AccountException>(() => env.Accounts.Create("jordan", TestEnv.Password));
+        using var journal = env.Accounts.SignIn("JORDAN", TestEnv.Password);
+        Assert.Equal("Jordan", journal.Username);
+        Assert.Equal("Jordan", env.Accounts.LastUsername);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class AccountMaintenanceTests
 
         Assert.False(File.Exists(stale));
         Assert.True(File.Exists(recent)); // might belong to an import in progress
-        Assert.Equal(["caleb"], env.Accounts.ListAccounts());
+        Assert.Equal(["jordan"], env.Accounts.ListAccounts());
     }
 
     [Fact]
@@ -78,13 +78,13 @@ public class AccountMaintenanceTests
             backup = env.TempFile("b.xjbackup");
             Backup.JournalTransfer.ExportEncrypted(source, backup);
         }
-        env.CreateJournal("Caleb").Dispose();
+        env.CreateJournal("Jordan").Dispose();
 
         using var imported = new Backup.JournalTransfer(env.Accounts)
-            .ImportBackup(backup, TestEnv.Password, "caleb", null, replaceExisting: true);
+            .ImportBackup(backup, TestEnv.Password, "jordan", null, replaceExisting: true);
 
-        Assert.Equal("Caleb", imported.Username);
-        Assert.Equal(["Caleb", "source"], env.Accounts.ListAccounts());
+        Assert.Equal("Jordan", imported.Username);
+        Assert.Equal(["Jordan", "source"], env.Accounts.ListAccounts());
     }
 
     [Fact]
@@ -105,15 +105,15 @@ public class AccountLockTests
     {
         using var env = new TestEnv();
         var first = env.CreateJournal();
-        var ex = Assert.Throws<AccountException>(() => env.Accounts.SignIn("caleb", TestEnv.Password));
+        var ex = Assert.Throws<AccountException>(() => env.Accounts.SignIn("jordan", TestEnv.Password));
         Assert.Contains("already open", ex.Message);
 
         // A second app instance (another AccountStore on the same folder) is refused too.
         var otherInstance = new Accounts.AccountStore(env.Root, env.Clock);
-        Assert.Throws<AccountException>(() => otherInstance.SignIn("CALEB", TestEnv.Password));
+        Assert.Throws<AccountException>(() => otherInstance.SignIn("JORDAN", TestEnv.Password));
 
         first.Dispose();
-        using var again = otherInstance.SignIn("caleb", TestEnv.Password);
+        using var again = otherInstance.SignIn("jordan", TestEnv.Password);
     }
 
     [Fact]
@@ -121,8 +121,8 @@ public class AccountLockTests
     {
         using var env = new TestEnv();
         env.CreateJournal().Dispose();
-        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("caleb", "wrong password"));
-        using var journal = env.Accounts.SignIn("caleb", TestEnv.Password);
+        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("jordan", "wrong password"));
+        using var journal = env.Accounts.SignIn("jordan", TestEnv.Password);
     }
 
     [Fact]
@@ -135,9 +135,9 @@ public class AccountLockTests
             backup = env.TempFile("b.xjbackup");
             Backup.JournalTransfer.ExportEncrypted(source, backup);
         }
-        using var open = env.CreateJournal("caleb");
+        using var open = env.CreateJournal("jordan");
         Assert.Throws<AccountException>(() =>
-            new Backup.JournalTransfer(env.Accounts).ImportBackup(backup, TestEnv.Password, "caleb", null, replaceExisting: true));
+            new Backup.JournalTransfer(env.Accounts).ImportBackup(backup, TestEnv.Password, "jordan", null, replaceExisting: true));
         Assert.Empty(Directory.EnumerateFiles(env.Accounts.UsersDirectory, ".import-*"));
     }
 }

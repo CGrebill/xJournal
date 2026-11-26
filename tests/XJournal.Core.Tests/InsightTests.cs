@@ -124,7 +124,7 @@ public class InsightTests
 
         Assert.Equal(2, count);
         var text = File.ReadAllText(path);
-        Assert.StartsWith("# caleb's journal", text);
+        Assert.StartsWith("# jordan's journal", text);
         Assert.Contains("_Exported from xJournal on", text);
         Assert.Contains("""
             ## Tuesday, November 24, 2026 · 14:31

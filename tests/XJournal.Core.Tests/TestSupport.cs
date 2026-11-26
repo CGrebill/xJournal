@@ -34,7 +34,7 @@ public sealed class TestEnv : IDisposable
     public FakeClock Clock { get; }
     public AccountStore Accounts { get; }
 
-    public Journal CreateJournal(string username = "caleb") => Accounts.Create(username, Password);
+    public Journal CreateJournal(string username = "jordan") => Accounts.Create(username, Password);
 
     public string TempFile(string name) => Path.Combine(Root, "files", name);
 

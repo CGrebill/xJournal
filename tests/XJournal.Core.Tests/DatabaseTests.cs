@@ -21,7 +21,7 @@ public class DatabaseTests
             session.Save();
         }
 
-        using var reopened = env.Accounts.SignIn("caleb", TestEnv.Password);
+        using var reopened = env.Accounts.SignIn("jordan", TestEnv.Password);
         var entry = Assert.Single(reopened.Entries.GetAll());
         Assert.Equal("Hello there", entry.Body);
         Assert.Equal("A title", entry.Summary);
@@ -32,9 +32,9 @@ public class DatabaseTests
     {
         using var env = new TestEnv();
         env.CreateJournal().Dispose();
-        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("caleb", "wrong password"));
-        Assert.False(JournalDatabase.CheckPassword(env.Accounts.PathFor("caleb"), "wrong password"));
-        Assert.True(JournalDatabase.CheckPassword(env.Accounts.PathFor("caleb"), TestEnv.Password));
+        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("jordan", "wrong password"));
+        Assert.False(JournalDatabase.CheckPassword(env.Accounts.PathFor("jordan"), "wrong password"));
+        Assert.True(JournalDatabase.CheckPassword(env.Accounts.PathFor("jordan"), TestEnv.Password));
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class DatabaseTests
             journal.Settings.Set("note", Secret);
         }
 
-        var bytes = File.ReadAllBytes(env.Accounts.PathFor("caleb"));
+        var bytes = File.ReadAllBytes(env.Accounts.PathFor("jordan"));
         Assert.DoesNotContain(Secret, Encoding.Latin1.GetString(bytes));
         Assert.DoesNotContain(Secret, Encoding.Unicode.GetString(bytes));
         Assert.DoesNotContain("SQLite format 3", Encoding.Latin1.GetString(bytes));
@@ -63,8 +63,8 @@ public class DatabaseTests
         using (var journal = env.CreateJournal())
             journal.Database.ChangePassword("a new password");
 
-        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("caleb", TestEnv.Password));
-        using var reopened = env.Accounts.SignIn("caleb", "a new password");
+        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("jordan", TestEnv.Password));
+        using var reopened = env.Accounts.SignIn("jordan", "a new password");
         Assert.Equal(0, reopened.Entries.Count());
     }
 
@@ -73,9 +73,9 @@ public class DatabaseTests
     {
         using var env = new TestEnv();
         const string password = "pä'ss\"wörd 🔒;--";
-        env.Accounts.Create("caleb", password).Dispose();
-        env.Accounts.SignIn("caleb", password).Dispose();
-        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("caleb", "pä'ss\"wörd"));
+        env.Accounts.Create("jordan", password).Dispose();
+        env.Accounts.SignIn("jordan", password).Dispose();
+        Assert.Throws<InvalidPasswordException>(() => env.Accounts.SignIn("jordan", "pä'ss\"wörd"));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class DatabaseTests
         using (var journal = env.CreateJournal())
             journal.Database.Connection.Execute("PRAGMA user_version = 999");
 
-        Assert.Throws<NewerVersionException>(() => env.Accounts.SignIn("caleb", TestEnv.Password));
+        Assert.Throws<NewerVersionException>(() => env.Accounts.SignIn("jordan", TestEnv.Password));
     }
 
     [Fact]

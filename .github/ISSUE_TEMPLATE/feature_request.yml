@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an idea for xJournal
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe the need or situation, not just the solution. ("When I …, I want to …, so that …")
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How might it work?
+      description: Optional. Any ideas for how it could look or behave.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you do today instead?

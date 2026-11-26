@@ -25,7 +25,7 @@ public sealed class MergeTests : IDisposable
 
         var backup = _home.TempFile("start.xjbackup");
         JournalTransfer.ExportEncrypted(_homeJournal, backup);
-        _laptopJournal = new JournalTransfer(_laptop.Accounts).ImportBackup(backup, TestEnv.Password, "caleb", null, false);
+        _laptopJournal = new JournalTransfer(_laptop.Accounts).ImportBackup(backup, TestEnv.Password, "jordan", null, false);
     }
 
     public void Dispose()
@@ -308,7 +308,7 @@ public class RevisionTests
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         JournalTransfer.ExportJson(journal, path);
         Assert.Contains("\"revisions\"", File.ReadAllText(path));
-        using var imported = new JournalTransfer(laptop.Accounts).ImportJson(path, "caleb", TestEnv.Password, false);
+        using var imported = new JournalTransfer(laptop.Accounts).ImportJson(path, "jordan", TestEnv.Password, false);
         var revision = Assert.Single(imported.Entries.GetRevisions(imported.Entries.GetLatest()!.Id));
         Assert.Equal("Before", revision.Body);
         Assert.Equal(home.Clock.Now.AddHours(-1), revision.UpdatedAt);
@@ -325,7 +325,7 @@ public class RevisionTests
         {
             journal.Database.Connection.Execute("DROP TABLE entry_revisions; PRAGMA user_version = 1;");
         }
-        using var reopened = env.Accounts.SignIn("caleb", TestEnv.Password);
+        using var reopened = env.Accounts.SignIn("jordan", TestEnv.Password);
         Assert.Equal(2, reopened.Database.SchemaVersion);
         Assert.Empty(reopened.Entries.GetAllRevisions());
     }

@@ -59,7 +59,7 @@ public class TransferTests
         Assert.Equal(2, summary.AnsweredDays);
 
         using var imported = new JournalTransfer(laptop.Accounts)
-            .ImportBackup(backup, TestEnv.Password, "caleb", newPassword: null, replaceExisting: false);
+            .ImportBackup(backup, TestEnv.Password, "jordan", newPassword: null, replaceExisting: false);
         AssertSameContent(journal, imported);
         Assert.Equal("Good mood", imported.Questions.GetVersion(imported.Answers.GetHistory("mood")[0].VersionId)!.Text);
     }
@@ -76,12 +76,12 @@ public class TransferTests
 
         Assert.Throws<InvalidPasswordException>(() => JournalTransfer.InspectBackup(backup, TestEnv.Password));
         var transfer = new JournalTransfer(laptop.Accounts);
-        Assert.Throws<InvalidPasswordException>(() => transfer.ImportBackup(backup, TestEnv.Password, "caleb", null, false));
+        Assert.Throws<InvalidPasswordException>(() => transfer.ImportBackup(backup, TestEnv.Password, "jordan", null, false));
         Assert.Empty(laptop.Accounts.ListAccounts());
 
-        using (var imported = transfer.ImportBackup(backup, "backup password", "caleb", "laptop password", false))
+        using (var imported = transfer.ImportBackup(backup, "backup password", "jordan", "laptop password", false))
             AssertSameContent(journal, imported);
-        laptop.Accounts.SignIn("caleb", "laptop password").Dispose();
+        laptop.Accounts.SignIn("jordan", "laptop password").Dispose();
     }
 
     [Fact]
@@ -95,11 +95,11 @@ public class TransferTests
             backup = env.TempFile("b.xjbackup");
             JournalTransfer.ExportEncrypted(journal, backup);
         }
-        env.CreateJournal("caleb").Dispose();
+        env.CreateJournal("jordan").Dispose();
 
         var transfer = new JournalTransfer(env.Accounts);
-        Assert.Throws<AccountException>(() => transfer.ImportBackup(backup, TestEnv.Password, "caleb", null, false));
-        using var imported = transfer.ImportBackup(backup, TestEnv.Password, "caleb", null, replaceExisting: true);
+        Assert.Throws<AccountException>(() => transfer.ImportBackup(backup, TestEnv.Password, "jordan", null, false));
+        using var imported = transfer.ImportBackup(backup, TestEnv.Password, "jordan", null, replaceExisting: true);
 
         Assert.Equal(2, imported.Entries.Count());
         Assert.Single(Directory.GetFiles(env.Accounts.SafetyBackupsDirectory));
@@ -121,7 +121,7 @@ public class TransferTests
         Assert.Contains("\"text\": \"Good mood\"", json);
         Assert.Equal(2, JournalTransfer.InspectJson(path).EntryCount);
 
-        using var imported = new JournalTransfer(laptop.Accounts).ImportJson(path, "caleb", "new password", false);
+        using var imported = new JournalTransfer(laptop.Accounts).ImportJson(path, "jordan", "new password", false);
         AssertSameContent(journal, imported);
         Assert.Single(imported.Entries.Search(new("secretword")));
     }

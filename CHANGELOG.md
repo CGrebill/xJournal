@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 (2026-11-26)
+
+**Fixed**
+- On Windows, the window title was drawn twice in the top-left corner (the system's title on top of xJournal's own), and an unneeded full-screen button appeared next to minimize, maximize and close.
+
+**Documentation**
+- Screenshots in the README, plus a security policy, contributing guide, and issue and pull-request templates.
+
 ## 1.0.0 (2026-11-26)
 
 The first release of xJournal.

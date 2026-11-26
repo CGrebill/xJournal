@@ -6,6 +6,19 @@ A private desktop journal that runs itself. Sign in and start typing. Entries ar
 
 Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](https://github.com/amwx/FluentAvalonia), so it has a Windows 11 (WinUI-style) look with Mica, and it runs on Windows, macOS and Linux.
 
+![xJournal's main window: the clock, a summary line and the journal editor, with New entry, Search and Calendar on the right](docs/screenshots/main.png)
+
+| | |
+| --- | --- |
+| ![Today's check-in: five 1–5 questions answered as pill buttons](docs/screenshots/check-in.png) | ![Trends: a line chart of one question's answers, with a marker where the question was reworded](docs/screenshots/trends.png) |
+| **Daily check-in** with your own questions | **Trends** for every question |
+| ![Calendar: a month grid with dots on days with entries and check marks on check-in days](docs/screenshots/calendar.png) | ![Writing stats: streak, weekly and monthly totals, and a words-per-week bar chart](docs/screenshots/writing-stats.png) |
+| **Calendar** of your writing and check-ins | **Writing stats** and streaks |
+| ![Search results with highlighted matches](docs/screenshots/search.png) | ![The main window in dark mode](docs/screenshots/main-dark.png) |
+| **Search** everything you've written | **Dark mode**, following your system |
+
+<sub>Screenshots use a demo journal. On Windows 11 the window background is translucent Mica.</sub>
+
 ## Download
 
 Get the latest version from the [Releases page](https://github.com/CGrebill/xJournal/releases/latest).
@@ -68,6 +81,8 @@ To publish a self-contained Windows build:
 ```bash
 dotnet publish src/XJournal.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
+
+To regenerate the README screenshots from a demo journal, run `XJOURNAL_DOCS_SCREENSHOTS=docs/screenshots dotnet test --filter DocsScreenshots`.
 
 CI builds with warnings treated as errors and runs every test on Windows and Linux for each push (`.github/workflows/ci.yml`). The UI tests run headlessly. Set `XJOURNAL_SCREENSHOTS=<folder>` to save a render of each screen.
 
@@ -140,6 +155,10 @@ Each journal is a single SQLite database. Entries, the search index, questions, 
 2. Commit, then tag and push: `git tag v1.2.3 && git push origin v1.2.3`.
 
 The Release workflow (`.github/workflows/release.yml`) runs the tests, builds every download, and publishes a GitHub Release with the changelog section as its notes. Changing the packaging files builds the downloads without releasing, so they can be checked first.
+
+## Contributing and security
+
+Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Please report security problems privately, as described in [SECURITY.md](SECURITY.md), and never attach real journal files or passwords to an issue.
 
 ## License
 
