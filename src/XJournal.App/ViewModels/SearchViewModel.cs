@@ -10,6 +10,14 @@ namespace XJournal.App.ViewModels;
 public sealed record SearchResultItem(long Id, string DateText, string TimeText, string Summary, string Snippet, bool IsCurrent)
 {
     public bool HasSummary => Summary.Length > 0;
+
+    public static SearchResultItem From(JournalEntry entry, string snippet, long currentEntryId) => new(
+        entry.Id,
+        entry.CreatedAt.ToString("ddd, MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture),
+        entry.CreatedAt.ToString("t", System.Globalization.CultureInfo.CurrentCulture),
+        entry.Summary.Trim(),
+        snippet,
+        entry.Id == currentEntryId);
 }
 
 /// <summary>Search by words and/or dates. Results refresh as you type.</summary>
@@ -88,17 +96,7 @@ public sealed partial class SearchViewModel : ViewModelBase
         var results = _journal.Entries.Search(new EntryQuery(Query, from, to));
         var current = _currentEntryId();
         Results.Clear();
-        foreach (var r in results)
-        {
-            var e = r.Entry;
-            Results.Add(new SearchResultItem(
-                e.Id,
-                e.CreatedAt.ToString("ddd, MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture),
-                e.CreatedAt.ToString("t", System.Globalization.CultureInfo.CurrentCulture),
-                e.Summary.Trim(),
-                r.Snippet,
-                e.Id == current));
-        }
+        foreach (var r in results) Results.Add(SearchResultItem.From(r.Entry, r.Snippet, current));
 
         var filtered = !string.IsNullOrWhiteSpace(Query) || from is not null || to is not null;
         HasNoResults = Results.Count == 0;

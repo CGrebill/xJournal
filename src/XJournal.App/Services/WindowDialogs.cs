@@ -30,6 +30,7 @@ public static class FileTypes
     public static readonly FilePickerFileType Backup = new("xJournal backup") { Patterns = ["*.xjbackup"] };
     public static readonly FilePickerFileType JournalJson = new("xJournal export (JSON)") { Patterns = ["*.json"] };
     public static readonly FilePickerFileType AnyJournal = new("xJournal backup or export") { Patterns = ["*.xjbackup", "*.json"] };
+    public static readonly FilePickerFileType Markdown = new("Markdown") { Patterns = ["*.md"] };
     public static readonly FilePickerFileType QuestionJson = new("Question file (JSON)") { Patterns = ["*.json"] };
 }
 

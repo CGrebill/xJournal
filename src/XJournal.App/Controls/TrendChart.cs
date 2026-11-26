@@ -64,6 +64,7 @@ public sealed class TrendChart : Control
 
     public override void Render(DrawingContext context)
     {
+        if (Bounds.Width < Left + Right + 40 || Bounds.Height < Top + Bottom + 20) return; // no room to draw
         var text = Brush("TextFillColorSecondaryBrush", Brushes.Gray);
         var primary = Brush("TextFillColorPrimaryBrush", Brushes.Black);
         var grid = new Pen(Brush("DividerStrokeColorDefaultBrush", Brushes.LightGray), 1);
@@ -88,7 +89,7 @@ public sealed class TrendChart : Control
         {
             var day = DateOnly.FromDayNumber(From.DayNumber + (int)Math.Round(days * i / (double)ticks));
             var label = Text(day.ToString(days > 400 ? "MMM yyyy" : "MMM d", CultureInfo.CurrentCulture), 12, text, typeface);
-            var x = Math.Clamp(X(day) - label.Width / 2, plot.Left - 8, plot.Right - label.Width + 8);
+            var x = Math.Clamp(X(day) - label.Width / 2, plot.Left - 8, Math.Max(plot.Left - 8, plot.Right - label.Width + 8));
             context.DrawText(label, new Point(x, plot.Bottom + 8));
         }
 

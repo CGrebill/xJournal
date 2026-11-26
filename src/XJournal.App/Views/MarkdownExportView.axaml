@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:XJournal.App.ViewModels"
+             x:Class="XJournal.App.Views.MarkdownExportView"
+             x:DataType="vm:MarkdownExportViewModel"
+             Width="440">
+  <StackPanel Spacing="14">
+    <TextBlock Classes="secondary" TextWrapping="Wrap"
+               Text="Save your entries as Markdown: plain text files you can open in any editor or notes app. Markdown files are NOT encrypted, so keep them somewhere safe." />
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Entries from" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <CalendarDatePicker SelectedDate="{Binding FromDate}" Width="150" />
+        <TextBlock Text="to" VerticalAlignment="Center" />
+        <CalendarDatePicker SelectedDate="{Binding ToDate}" Width="150" />
+      </StackPanel>
+      <TextBlock Classes="caption" Text="Leave the start empty to begin with your first entry, and the end empty to include everything up to today." TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Format" />
+      <RadioButton GroupName="mdformat" IsChecked="{Binding SingleDocument}" Content="One document with every entry" />
+      <RadioButton GroupName="mdformat" IsChecked="{Binding OneFilePerEntry}">
+        <TextBlock TextWrapping="Wrap" Text="A folder with one file per entry (good for notes apps like Obsidian)" />
+      </RadioButton>
+    </StackPanel>
+
+    <CheckBox IsChecked="{Binding IncludeCheckIns}" Content="Include each day's check-in answers" />
+
+    <TextBlock Classes="error" Text="{Binding Error}"
+               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </StackPanel>
+</UserControl>

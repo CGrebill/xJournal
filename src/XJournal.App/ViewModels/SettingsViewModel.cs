@@ -183,6 +183,34 @@ public sealed partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task ExportMarkdownAsync()
+    {
+        var options = new MarkdownExportViewModel();
+        var view = new Views.MarkdownExportView { DataContext = options };
+        if (!await _dialogs.ShowContentAsync("Export entries as Markdown", view, "Choose location…", "Cancel",
+                () => Task.FromResult(options.Validate())))
+            return;
+
+        var stamp = _journal.Clock.LocalNow().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var destination = options.OneFilePerEntry
+            ? await _dialogs.PickFolderAsync("Folder to export the entries into")
+            : await _dialogs.PickSaveFileAsync("Save Markdown export", $"xJournal-{_journal.Username}-{stamp}.md", FileTypes.Markdown);
+        if (destination is null || _journal.IsDisposed) return;
+        if (options.OneFilePerEntry) destination = Path.Combine(destination, $"xJournal-{_journal.Username}-{stamp}");
+
+        try
+        {
+            var count = Core.Export.MarkdownExporter.Export(_journal, destination, options.ToOptions());
+            await _dialogs.ShowMessageAsync("Export complete",
+                $"Exported {count} entr{(count == 1 ? "y" : "ies")} to:\n{destination}");
+        }
+        catch (Exception ex) when (Errors.IsExpected(ex))
+        {
+            await _dialogs.ShowMessageAsync("Couldn't export", ex.Message);
+        }
+    }
+
+    [RelayCommand]
     private async Task ExportJsonAsync()
     {
         var proceed = await _dialogs.ConfirmAsync("Export readable copy?",

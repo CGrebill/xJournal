@@ -5,11 +5,15 @@ using XJournal.Core.Models;
 
 namespace XJournal.App.ViewModels;
 
-public sealed record TrendQuestion(Question Question)
+/// <summary>An item in the Trends list: "Your writing" (no question) or one check-in question.</summary>
+public sealed record TrendQuestion(Question? Question)
 {
-    public string Text => Question.Current.Text;
-    public bool IsArchived => Question.Archived;
+    public string Text => Question?.Current.Text ?? "Your writing";
+    public bool IsArchived => Question?.Archived == true;
+    public bool IsWriting => Question is null;
 }
+
+public sealed record StatTile(string Label, string Value, string Detail);
 
 public sealed record RangeOption(string Label, int? Days)
 {
@@ -26,13 +30,23 @@ public sealed partial class TrendsViewModel : ViewModelBase
     {
         _journal = journal;
         _openEntry = openEntry;
-        Questions = journal.Questions.GetAll(includeArchived: true).Select(q => new TrendQuestion(q)).ToList();
+        Questions = [new TrendQuestion(null), .. journal.Questions.GetAll(includeArchived: true).Select(q => new TrendQuestion(q))];
         SelectedRange = Ranges[1];
-        SelectedQuestion = Questions.Count > 0 ? Questions[0] : null;
+        SelectedQuestion = Questions[0];
     }
 
+    /// <summary>"Your writing" first, then every question (archived ones included).</summary>
     public IReadOnlyList<TrendQuestion> Questions { get; }
-    public bool HasQuestions => Questions.Count > 0;
+    public bool HasQuestions => Questions.Count > 1;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsQuestionSelected))]
+    public partial bool IsWritingSelected { get; set; }
+
+    public bool IsQuestionSelected => !IsWritingSelected;
+
+    [ObservableProperty] public partial IReadOnlyList<StatTile> WritingTiles { get; set; } = [];
+    [ObservableProperty] public partial IReadOnlyList<BarPoint> WeeklyWords { get; set; } = [];
 
     public IReadOnlyList<RangeOption> Ranges { get; } =
     [
@@ -54,6 +68,29 @@ public sealed partial class TrendsViewModel : ViewModelBase
     partial void OnSelectedQuestionChanged(TrendQuestion? value) => Reload();
     partial void OnSelectedRangeChanged(RangeOption value) => Reload();
 
+    private void LoadWriting()
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        var s = Core.Insights.WritingStats.Compute(_journal, culture.DateTimeFormat.FirstDayOfWeek);
+        static string Days(int n) => n == 1 ? "1 day" : $"{n:N0} days";
+        static string Entries(int n) => n == 1 ? "1 entry" : $"{n:N0} entries";
+        WritingTiles =
+        [
+            new("Current streak", Days(s.CurrentStreak), "Days in a row with an entry"),
+            new("Longest streak", Days(s.LongestStreak), "Your best run so far"),
+            new("This week", Entries(s.EntriesThisWeek), $"{s.WordsThisWeek:N0} words"),
+            new("This month", Entries(s.EntriesThisMonth), $"{s.WordsThisMonth:N0} words"),
+            new("All time", Entries(s.TotalEntries), $"{s.TotalWords:N0} words"),
+            new("Average entry", $"{s.AverageWords:N0} words", "Per entry"),
+        ];
+        WeeklyWords = s.RecentWeeks
+            .Select(w => new BarPoint(
+                w.WeekStart.ToString("MMM d", culture),
+                w.Words,
+                $"Week of {w.WeekStart.ToString("MMM d", culture)}: {w.Words:N0} words · {Entries(w.Entries)}"))
+            .ToList();
+    }
+
     public void OpenEntry(TrendPoint point)
     {
         if (point.EntryId is { } id) _openEntry(id);
@@ -61,13 +98,18 @@ public sealed partial class TrendsViewModel : ViewModelBase
 
     private void Reload()
     {
-        if (SelectedQuestion is not { } selected || SelectedRange is null)
+        IsWritingSelected = SelectedQuestion?.IsWriting == true;
+        if (IsWritingSelected)
+        {
+            LoadWriting();
+            return;
+        }
+        if (SelectedQuestion?.Question is not { } question || SelectedRange is null)
         {
             Points = [];
             return;
         }
 
-        var question = selected.Question;
         var today = _journal.Clock.Today();
         var history = _journal.Answers.GetHistory(question.Id);
         DateOnly from = SelectedRange.Days is { } days

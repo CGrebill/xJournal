@@ -12,11 +12,15 @@ Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](ht
 - **Summary line.** An optional one-line tagline per entry. It's searchable.
 - **Search.** Full-text search across all entries. Words match as prefixes, and `"quoted phrases"` match exactly. Matches are highlighted. You can filter by date (today, past 7/30 days, past year, or a custom range).
 - **Check-in questions.** You import your own 1–5 scale questions from a JSON file (format below) and answer them in a separate window, once per day. Answers save as you click, and each day's answers are linked to the entry you were writing. A gentle reminder appears if you haven't answered yet today.
+- **Calendar.** A month view showing the days you wrote (the dot grows with the number of entries) and the days you checked in. Click a day to see its entries, then open one.
+- **On this day.** On a fresh entry, a small card shows what you wrote on this date last month or in earlier years. Hide it for the day with ×.
+- **Writing stats & streaks.** Trends → *Your writing* shows your current and longest streak, entries and words this week, this month and all time, and a chart of words per week. A streak of 2+ days also appears next to the clock.
 - **Trends.** A chart of each question over time (30 days, 90 days, a year, or all time). Hovering shows the exact wording that was answered, and clicking a point opens that day's entry.
 - **Encrypted.** Your password encrypts the whole journal file (see Security).
 - **Locks itself.** After 15 minutes without typing or mouse activity, xJournal saves and signs out. You can change the time, or turn it off, in Settings.
 - **One window per journal.** The same account can't be open twice at once, even in two copies of the app, so two windows can't save over each other.
 - **Fails gracefully.** If something unexpected goes wrong you get a message, not a vanished window. Technical details go to a local log, which never contains journal text.
+- **Markdown export.** Export any date range of entries as one document, or as one file per entry (with front matter, for notes apps such as Obsidian), optionally with each day's check-in answers. Like the JSON export, it isn't encrypted.
 - **Backup and moving computers.** You can export an encrypted backup or a readable JSON copy, then import either from the sign-in screen on another computer. Optional automatic backups go to any folder (e.g. a OneDrive, Dropbox or Google Drive folder) every time you sign out.
 - **Writing on more than one computer.** Merge a backup from another computer into your journal (see below).
 - **Previous versions.** When a merge replaces an entry's text, the old text is kept. You can restore it from the editor's **…** menu.
@@ -27,9 +31,10 @@ Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](ht
 | --- | --- |
 | Ctrl+N | New entry |
 | Ctrl+F | Search entries |
+| Ctrl+D | Calendar |
 | Ctrl+Q | Open today's check-in |
 | Ctrl+S | Save now (it also saves on its own) |
-| Esc | Close search, or close the check-in window |
+| Esc | Close search or the calendar, or close the check-in window |
 
 ## Building and running
 
@@ -91,7 +96,7 @@ Questions are plain JSON, so you can write them in any editor. Comments and trai
 
 - A question is identified by its `id`. Keep the id the same and you can change the text or scale freely. The change becomes a new *version*, and earlier answers stay attached to the exact wording they were given for. Trends show where the wording changed.
 - Question versions can never be edited or deleted. This is enforced inside the database itself, not just by the app.
-- A question you leave out of a later file is **archived**, not deleted. It disappears from the check-in, but its answers and trends remain. Put it back in a file and it returns. You can also import in "add only" mode, which archives nothing.
+- When an import replaces your question set (the default), a question you leave out of the file is **archived**, not deleted. It disappears from the check-in, but its answers and trends remain. Put it back in a file and it returns. You can also import in "add only" mode, which archives nothing.
 - Before anything is saved, the importer shows exactly what will be added, reworded and archived.
 
 ## Where your data lives
@@ -101,8 +106,8 @@ Questions are plain JSON, so you can write them in any editor. Comments and trai
 | Journals (one encrypted file per account) | `%APPDATA%\xJournal\users\<username>.xjdb` on Windows, `~/.config/xJournal/users/` on Linux and macOS |
 | Copies kept when an import replaces an account, and safety copies taken before a merge | `…\xJournal\replaced\` |
 | Last username (not sensitive) | `…\xJournal\state.json` |
-| Error log (technical details only; newest 10 days kept) | `…\xJournal\logs\` |
-| Lock file while a journal is open (empty) | `…\xJournal\users\<username>.lock` |
+| Error log (technical details only; one file per day with errors, last 10 kept) | `…\xJournal\logs\` |
+| Lock files that stop a journal being opened twice (empty) | `…\xJournal\users\<username in lowercase>.lock` |
 
 Each journal is a single SQLite database. Entries, the search index, questions, answers and settings are all inside it.
 
@@ -112,12 +117,15 @@ Each journal is a single SQLite database. Entries, the search index, questions, 
 - Your password (or anything derived from it) isn't stored anywhere. Signing in simply tries to decrypt the file.
 - **If you forget your password, the journal can't be recovered.** Keep a backup, and keep its password somewhere safe.
 - An encrypted backup (`.xjbackup`) opens with your password at the time of the backup, or with a separate password you choose when exporting.
-- The readable JSON export is **not** encrypted. The app warns you before writing one.
+- The readable JSON export and the Markdown export are **not** encrypted. The app warns you before writing either.
 
 ## Project layout
 
 ```
-src/XJournal.Core     storage, encryption, entries, search, questions, backups (no UI)
-src/XJournal.App      Avalonia desktop app (views, view models, theme)
+src/XJournal.Core     storage & encryption, entries & search, questions & answers,
+                      backup/import/merge, insights (stats, on this day), Markdown export (no UI)
+src/XJournal.App      Avalonia desktop app (views, view models, theme, charts)
 tests/                xUnit tests for the core and headless UI tests for the app
+tools/make_icon.py    draws the app icon
+.github/workflows     CI on Windows and Linux
 ```

@@ -111,6 +111,7 @@
               <WrapPanel ItemSpacing="8" LineSpacing="8">
                 <Button Classes="accent" Content="Export encrypted backup…" Command="{Binding ExportBackupCommand}" />
                 <Button Content="Export readable copy (JSON)…" Command="{Binding ExportJsonCommand}" />
+                <Button Content="Export entries as Markdown…" Command="{Binding ExportMarkdownCommand}" />
               </WrapPanel>
             </StackPanel>
           </Grid>

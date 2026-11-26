@@ -6,7 +6,7 @@
                  x:Class="XJournal.App.Views.TrendsWindow"
                  x:DataType="vm:TrendsViewModel"
                  Title="Trends · xJournal"
-                 Width="1000" Height="640" MinWidth="720" MinHeight="460"
+                 Width="1000" Height="660" MinWidth="720" MinHeight="480"
                  WindowStartupLocation="CenterOwner">
   <Grid RowDefinitions="36,Auto,*">
     <TextBlock Classes="app-title titlebar" Text="Trends" IsHitTestVisible="False" />
@@ -14,27 +14,63 @@
     <Grid Grid.Row="1" Margin="24,8,24,16" ColumnDefinitions="*,Auto">
       <StackPanel Spacing="2">
         <TextBlock Classes="title" Text="Trends" />
-        <TextBlock Classes="secondary" Text="How your answers have changed over time." />
+        <TextBlock Classes="secondary" Text="Your writing habits, and how your answers have changed over time." />
       </StackPanel>
-      <ComboBox Grid.Column="1" VerticalAlignment="Center" MinWidth="160"
+      <ComboBox Grid.Column="1" VerticalAlignment="Center" MinWidth="160" IsVisible="{Binding IsQuestionSelected}"
                 ItemsSource="{Binding Ranges}" SelectedItem="{Binding SelectedRange}" />
     </Grid>
 
-    <Grid Grid.Row="2" Margin="24,0,24,24" ColumnDefinitions="280,16,*" IsVisible="{Binding HasQuestions}">
+    <Grid Grid.Row="2" Margin="24,0,24,24" ColumnDefinitions="280,16,*">
       <Border Classes="card" Padding="6">
-        <ListBox ItemsSource="{Binding Questions}" SelectedItem="{Binding SelectedQuestion}" Background="Transparent">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:TrendQuestion">
-              <StackPanel Spacing="2" Margin="2,4">
-                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
-                <TextBlock Classes="caption" Text="Archived" IsVisible="{Binding IsArchived}" />
-              </StackPanel>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+        <Grid RowDefinitions="*,Auto">
+          <ListBox ItemsSource="{Binding Questions}" SelectedItem="{Binding SelectedQuestion}" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:TrendQuestion">
+                <Grid ColumnDefinitions="Auto,*" Margin="2,4">
+                  <fa:FASymbolIcon Symbol="Edit" FontSize="14" Margin="0,2,10,0" VerticalAlignment="Top"
+                                   IsVisible="{Binding IsWriting}" />
+                  <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontWeight="{Binding IsWriting, Converter={x:Static c:Converters.BoolToSemiBold}}" />
+                    <TextBlock Classes="caption" Text="Archived" IsVisible="{Binding IsArchived}" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Grid.Row="1" Classes="caption" Margin="10,8" TextWrapping="Wrap" IsVisible="{Binding !HasQuestions}"
+                     Text="Import check-in questions (from the check-in window) and your answers will be charted here too." />
+        </Grid>
       </Border>
 
-      <Border Grid.Column="2" Classes="card" Padding="20">
+      <!-- Your writing -->
+      <Border Grid.Column="2" Classes="card" Padding="20" IsVisible="{Binding IsWritingSelected}">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
+          <TextBlock Classes="subtitle" Text="Your writing" />
+          <ItemsControl Grid.Row="1" Margin="0,14,0,0" ItemsSource="{Binding WritingTiles}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Columns="3" Margin="-4" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:StatTile">
+                <Border Classes="layer" Margin="4" Padding="14,10">
+                  <StackPanel Spacing="1">
+                    <TextBlock Classes="caption" Text="{Binding Label}" />
+                    <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Classes="caption" Text="{Binding Detail}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Grid.Row="2" Classes="body-strong" Margin="0,18,0,6" Text="Words per week" />
+          <c:BarChart Grid.Row="3" Bars="{Binding WeeklyWords}" MinHeight="140" />
+        </Grid>
+      </Border>
+
+      <!-- A question -->
+      <Border Grid.Column="2" Classes="card" Padding="20" IsVisible="{Binding IsQuestionSelected}">
         <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
           <TextBlock Classes="subtitle" TextWrapping="Wrap" Text="{Binding SelectedQuestion.Text, FallbackValue=''}" />
           <TextBlock Grid.Row="1" Classes="secondary" Margin="0,4,0,12" Text="{Binding Stats}" />
@@ -56,15 +92,5 @@
         </Grid>
       </Border>
     </Grid>
-
-    <Border Grid.Row="2" Classes="card" Margin="24,0,24,24" Padding="32" VerticalAlignment="Top"
-            IsVisible="{Binding !HasQuestions}">
-      <StackPanel Spacing="8">
-        <fa:FASymbolIcon Symbol="CalendarMonth" FontSize="32" HorizontalAlignment="Left" />
-        <TextBlock Classes="subtitle" Text="Nothing to chart yet" />
-        <TextBlock Classes="secondary" TextWrapping="Wrap"
-                   Text="Import some questions from the check-in window and answer them each day. Your trends will show up here." />
-      </StackPanel>
-    </Border>
   </Grid>
 </c:JournalWindow>

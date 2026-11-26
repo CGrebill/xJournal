@@ -291,7 +291,8 @@ public sealed class UiTests : IDisposable
         };
         trends.Show();
         var trendsVm = (TrendsViewModel)trends.DataContext;
-        trendsVm.SelectedQuestion = trendsVm.Questions.Single(q => q.Question.Id == "mood");
+        Assert.True(trendsVm.IsWritingSelected); // "Your writing" opens first
+        trendsVm.SelectedQuestion = trendsVm.Questions.Single(q => q.Question?.Id == "mood");
         trendsVm.SelectedRange = trendsVm.Ranges[0];
         Pump();
         Assert.Contains(trendsVm.Points, p => p.Reworded);
@@ -384,6 +385,168 @@ public sealed class UiTests : IDisposable
         Assert.Equal("Written at home.", mainVm.Body);
         Assert.Equal(2, mainVm.RevisionCount); // the laptop text is kept too
         main.Close();
+    }
+
+    private sealed class ShiftedClock(TimeSpan offset) : IClock
+    {
+        public DateTimeOffset Now => DateTimeOffset.Now + offset;
+        public TimeZoneInfo TimeZone => TimeZoneInfo.Local;
+    }
+
+    [AvaloniaFact]
+    public void Writing_stats_show_streaks_and_weekly_words()
+    {
+        // Write on several past days (via clocks set back in time), then sign in today.
+        var daysAgo = new[] { 1, 2, 3, 9, 10, 17, 24, 25, 26, 27, 40, 60 };
+        var random = new Random(7);
+        foreach (var ago in daysAgo)
+        {
+            var store = new AccountStore(_root, new ShiftedClock(TimeSpan.FromDays(-ago)));
+            using var j = store.FindAccount("caleb") is null ? store.Create("caleb", Password) : store.SignIn("caleb", Password);
+            var session = new XJournal.Core.Sessions.EntrySession(j);
+            session.SetText("", string.Join(' ', Enumerable.Repeat("word", 40 + random.Next(260))));
+            session.Leave();
+        }
+
+        var journal = _accounts.SignIn("caleb", Password);
+        var (main, mainVm) = OpenMain(journal);
+        Assert.Equal("3-day streak", mainVm.StreakText);
+        mainVm.Body = "Writing today extends it.";
+        mainVm.SaveNow();
+        Assert.Equal("4-day streak", mainVm.StreakText);
+
+        var trends = new TrendsWindow { DataContext = new TrendsViewModel(journal, _ => { }) };
+        trends.Show();
+        var vm = (TrendsViewModel)trends.DataContext;
+        Assert.True(vm.IsWritingSelected);
+        Assert.Equal("4 days", vm.WritingTiles[0].Value);   // current streak
+        Assert.Equal("4 days", vm.WritingTiles[1].Value);   // longest (27–24 days ago is also 4)
+        Assert.Equal("13 entries", vm.WritingTiles[4].Value);
+        Assert.Equal(12, vm.WeeklyWords.Count);
+        Pump();
+        Screenshot(trends, "15-writing-stats");
+        Screenshot(main, "19-main-streak");
+        trends.Close();
+        main.Close();
+    }
+
+    [AvaloniaFact]
+    public void Calendar_shows_activity_and_opens_entries()
+    {
+        var journal = _accounts.Create("caleb", Password);
+        ImportSampleQuestions(journal);
+        journal.Answers.SaveForDay(journal.Clock.Today(), null,
+            new Dictionary<long, int> { [journal.Questions.Get("mood")!.Current.Id] = 4 }, journal.Clock.Now);
+        var (window, vm) = OpenMain(journal);
+        foreach (var (summary, body) in new[] { ("Morning", "Coffee and plans."), ("Evening", "Long walk, good talk.") })
+        {
+            vm.Summary = summary;
+            vm.Body = body;
+            vm.NewEntryCommand.Execute(null);
+        }
+
+        vm.ToggleCalendarCommand.Execute(null);
+        Pump();
+        Assert.True(vm.IsCalendarOpen);
+        var calendar = vm.Calendar;
+        Assert.Equal(42, calendar.Days.Count);
+        var today = calendar.Days.Single(d => d.IsToday);
+        Assert.Equal(2, today.Entries);
+        Assert.True(today.CheckedIn);
+        Assert.True(today.IsSelected);
+        Assert.Equal(["Morning", "Evening"], calendar.DayEntries.Select(e => e.Summary));
+        Assert.StartsWith("Wrote on 1 day", calendar.MonthSummary, StringComparison.Ordinal);
+        Screenshot(window, "16-calendar");
+
+        var title = calendar.MonthTitle;
+        calendar.PreviousMonthCommand.Execute(null);
+        Assert.NotEqual(title, calendar.MonthTitle);
+        calendar.ThisMonthCommand.Execute(null);
+        Assert.Equal(title, calendar.MonthTitle);
+
+        vm.OpenResult(calendar.DayEntries[0]);
+        Assert.True(vm.IsEditorOpen);
+        Assert.Equal("Morning", vm.Summary);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void On_this_day_card_appears_opens_and_dismisses()
+    {
+        var lastYear = DateTimeOffset.Now.AddYears(-1);
+        if (lastYear.Day != DateTimeOffset.Now.Day) return; // 29 February: no matching date last year
+        var past = new AccountStore(_root, new ShiftedClock(lastYear - DateTimeOffset.Now));
+        using (var then = past.Create("caleb", Password))
+        {
+            var session = new XJournal.Core.Sessions.EntrySession(then);
+            session.SetText("Last year's trip", "We drove to the coast.");
+            session.Leave();
+        }
+
+        var journal = _accounts.SignIn("caleb", Password);
+        var (window, vm) = OpenMain(journal); // a year later: the old entry isn't resumed
+        Assert.True(vm.ShowMemory);
+        Assert.Equal("On this day · 1 year ago", vm.MemoryTitle);
+        Assert.Equal("Last year's trip", vm.MemoryText);
+        Screenshot(window, "17-on-this-day");
+
+        vm.Body = "Typing hides it";
+        Assert.False(vm.ShowMemory);
+        vm.Body = "";
+        Assert.True(vm.ShowMemory);
+
+        vm.OpenMemoryCommand.Execute(null);
+        Assert.Equal("We drove to the coast.", vm.Body);
+        Assert.False(vm.ShowMemory); // not on a fresh entry any more
+
+        vm.NewEntryCommand.Execute(null);
+        Assert.True(vm.ShowMemory);
+        vm.DismissMemoryCommand.Execute(null);
+        Assert.False(vm.ShowMemory);
+        window.Close();
+
+        var (again, againVm) = OpenMain(_accounts.SignIn("caleb", Password));
+        Assert.False(againVm.ShowMemory); // dismissed for the rest of the day
+        again.Close();
+    }
+
+    [AvaloniaFact]
+    public void Markdown_export_options_render()
+    {
+        var options = new MarkdownExportViewModel { FromDate = DateTime.Today, ToDate = DateTime.Today.AddDays(-1) };
+        Assert.False(options.Validate());
+        options.ToDate = null;
+        Assert.True(options.Validate());
+        options.OneFilePerEntry = true;
+        Assert.False(options.SingleDocument);
+        Assert.True(options.ToOptions().OneFilePerEntry);
+        var dialog = Host(new MarkdownExportView { DataContext = options }, "Export entries as Markdown");
+        Screenshot(dialog, "18-markdown-export");
+        dialog.Close();
+    }
+
+    [AvaloniaFact]
+    public void Charts_survive_being_drawn_tiny()
+    {
+        var points = new[] { new XJournal.App.Controls.TrendPoint(new DateOnly(2026, 1, 1), 3, "Neutral", "Q", false, null) };
+        foreach (var size in new[] { 1.0, 30, 80 })
+        {
+            var window = new Window
+            {
+                Width = size, Height = size,
+                Content = new StackPanel
+                {
+                    Children =
+                    {
+                        new XJournal.App.Controls.TrendChart { Points = points, From = new DateOnly(2026, 1, 1), To = new DateOnly(2026, 2, 1), Width = size, Height = size },
+                        new XJournal.App.Controls.BarChart { Bars = [new("Jan 1", 10, "10 words")], Width = size, Height = size },
+                    },
+                },
+            };
+            window.Show();
+            Pump();
+            window.Close();
+        }
     }
 
     [AvaloniaFact]

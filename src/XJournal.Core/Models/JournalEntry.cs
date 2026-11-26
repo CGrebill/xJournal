@@ -41,6 +41,9 @@ public sealed record EntryRevision(
     public const string RestoreReason = "restore";
 }
 
+/// <summary>How much was written on one local calendar day.</summary>
+public sealed record DayActivity(DateOnly Day, int Entries, int Words);
+
 /// <summary>Search filter. <see cref="From"/> and <see cref="To"/> are inclusive local days.</summary>
 public sealed record EntryQuery(string? Text = null, DateOnly? From = null, DateOnly? To = null, int Limit = 500);
 

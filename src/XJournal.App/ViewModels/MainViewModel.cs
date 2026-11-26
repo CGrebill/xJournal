@@ -9,6 +9,13 @@ using XJournal.Core.Sessions;
 
 namespace XJournal.App.ViewModels;
 
+public enum MainPane
+{
+    Editor,
+    Search,
+    Calendar,
+}
+
 /// <summary>
 /// The journal screen. Typing is saved automatically after a short pause, and whenever you switch
 /// entries, leave the window, sign out or close the app.
@@ -34,6 +41,7 @@ public sealed partial class MainViewModel : ViewModelBase
         _owner = owner;
         Session = new EntrySession(journal);
         Search = new SearchViewModel(journal, OpenEntry, () => Session.Current.Id);
+        Calendar = new CalendarViewModel(journal, OpenEntry, () => Session.Current.Id);
 
         _autosave = new DispatcherTimer { Interval = AutosaveDelay };
         _autosave.Tick += (_, _) => SaveNow();
@@ -48,6 +56,10 @@ public sealed partial class MainViewModel : ViewModelBase
         _idleCheck.Start();
 
         Session.CurrentChanged += (_, _) => LoadCurrentEntry();
+        Session.Saved += (_, _) =>
+        {
+            if (!_wroteToday) RefreshStreak(); // the first entry of the day extends the streak
+        };
         Session.Begin();
         UpdateClock();
         RefreshQuestionState();
@@ -56,6 +68,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public Journal Journal { get; }
     public EntrySession Session { get; }
     public SearchViewModel Search { get; }
+    public CalendarViewModel Calendar { get; }
     public string Username => Journal.Username;
 
     /// <summary>Raised after signing out, with an optional notice for the login screen.</summary>
@@ -77,6 +90,7 @@ public sealed partial class MainViewModel : ViewModelBase
         Session.SetText(Summary, Body);
         UpdateWordCount();
         UpdateEntryStamp();
+        OnPropertyChanged(nameof(ShowMemory));
         if (Session.IsDirty)
         {
             SaveStatus = "Editing…";
@@ -113,6 +127,7 @@ public sealed partial class MainViewModel : ViewModelBase
         UpdateWordCount();
         UpdateEntryStamp();
         UpdateRevisions();
+        RefreshInsights();
         EditorFocusRequested?.Invoke();
     }
 
@@ -157,6 +172,7 @@ public sealed partial class MainViewModel : ViewModelBase
         UpdateRevisions();
         RefreshQuestionState();
         if (IsSearchOpen) Search.Run();
+        if (IsCalendarOpen) Calendar.Load();
     }
 
     /// <summary>Asks the view to put the caret in the editor.</summary>
@@ -164,7 +180,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void UpdateWordCount()
     {
-        var words = Body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        var words = Core.Insights.WordCounter.Count(Body);
         WordCount = words == 1 ? "1 word" : $"{words:N0} words";
     }
 
@@ -207,7 +223,7 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         _autosave.Stop();
         Session.StartNew();
-        IsSearchOpen = false;
+        ActivePane = MainPane.Editor;
     }
 
     private void OpenEntry(long id)
@@ -221,7 +237,7 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             _ = _dialogs.ShowMessageAsync("Can't open entry", ex.Message);
         }
-        IsSearchOpen = false;
+        ActivePane = MainPane.Editor;
     }
 
     [RelayCommand]
@@ -242,17 +258,98 @@ public sealed partial class MainViewModel : ViewModelBase
         }
     }
 
-    [ObservableProperty] public partial bool IsSearchOpen { get; set; }
+    // ------------------------------------------------------------------ panes (editor / search / calendar)
 
-    partial void OnIsSearchOpenChanged(bool value)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditorOpen), nameof(IsSearchOpen), nameof(IsCalendarOpen), nameof(ShowMemory))]
+    public partial MainPane ActivePane { get; set; }
+
+    public bool IsEditorOpen => ActivePane == MainPane.Editor;
+
+    public bool IsSearchOpen
     {
-        if (!value) return;
+        get => ActivePane == MainPane.Search;
+        set => ActivePane = value ? MainPane.Search : MainPane.Editor;
+    }
+
+    public bool IsCalendarOpen
+    {
+        get => ActivePane == MainPane.Calendar;
+        set => ActivePane = value ? MainPane.Calendar : MainPane.Editor;
+    }
+
+    partial void OnActivePaneChanged(MainPane value)
+    {
+        if (value == MainPane.Editor) return;
         SaveNow();
-        Search.Run();
+        if (value == MainPane.Search) Search.Run();
+        else Calendar.Load();
     }
 
     [RelayCommand]
     private void ToggleSearch() => IsSearchOpen = !IsSearchOpen;
+
+    [RelayCommand]
+    private void ToggleCalendar() => IsCalendarOpen = !IsCalendarOpen;
+
+    /// <summary>Opens an entry picked from search results or the calendar.</summary>
+    public void OpenResult(SearchResultItem item) => OpenEntry(item.Id);
+
+    // ------------------------------------------------------------------ on this day & streak
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMemory), nameof(MemoryTitle), nameof(MemoryText))]
+    public partial Core.Insights.Memory? Memory { get; set; }
+
+    [ObservableProperty] public partial string StreakText { get; set; } = "";
+
+    /// <summary>Shown only on a fresh, unstarted entry, so it never gets in the way of writing.</summary>
+    public bool ShowMemory => Memory is not null && IsEditorOpen && !Session.Current.IsPersisted && Session.Current.IsEmpty;
+
+    public string MemoryTitle => Memory is { } m ? $"On this day · {m.Ago}" : "";
+
+    public string MemoryText => Memory is { } m
+        ? string.IsNullOrWhiteSpace(m.Entry.Summary)
+            ? Core.Search.FtsQuery.Preview("", m.Entry.Body, 160)
+            : m.Entry.Summary.Trim()
+        : "";
+
+    private void RefreshInsights()
+    {
+        if (_closed) return;
+        var today = Journal.Clock.Today();
+        var dismissed = Journal.Settings.Get("memory_dismissed_day");
+        Memory = dismissed == today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+            ? null
+            : Core.Insights.OnThisDay.Find(Journal, today) is [var latest, ..] ? latest : null;
+
+        RefreshStreak();
+    }
+
+    private bool _wroteToday;
+
+    private void RefreshStreak()
+    {
+        var stats = Core.Insights.WritingStats.Compute(Journal,
+            System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek, weeks: 1);
+        var today = Journal.Clock.Today();
+        _wroteToday = Journal.Entries.GetDayActivity(today, today).Count > 0;
+        StreakText = stats.CurrentStreak >= 2 ? $"{stats.CurrentStreak}-day streak" : "";
+    }
+
+    [RelayCommand]
+    private void OpenMemory()
+    {
+        if (Memory is { } memory) OpenEntry(memory.Entry.Id);
+    }
+
+    [RelayCommand]
+    private void DismissMemory()
+    {
+        Journal.Settings.Set("memory_dismissed_day",
+            Journal.Clock.Today().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+        Memory = null;
+    }
 
     // ------------------------------------------------------------------ questions
 

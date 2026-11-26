@@ -8,9 +8,44 @@
                  Title="xJournal"
                  Width="1120" Height="740" MinWidth="880" MinHeight="580"
                  WindowStartupLocation="CenterScreen">
+  <Window.Resources>
+    <!-- An entry in search results or the calendar's day list -->
+    <DataTemplate x:Key="EntryResultTemplate" x:DataType="vm:SearchResultItem">
+      <Grid ColumnDefinitions="150,*">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{Binding DateText}" FontWeight="SemiBold" />
+          <TextBlock Classes="caption" Text="{Binding TimeText}" />
+          <TextBlock Classes="caption" Text="Open now" IsVisible="{Binding IsCurrent}"
+                     Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="2">
+          <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" IsVisible="{Binding HasSummary}"
+                     TextTrimming="CharacterEllipsis" />
+          <c:HighlightTextBlock MarkedText="{Binding Snippet}" TextWrapping="Wrap" MaxLines="2"
+                                TextTrimming="CharacterEllipsis"
+                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+    <DataTemplate x:Key="CompactEntryTemplate" x:DataType="vm:SearchResultItem">
+      <StackPanel Spacing="2">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="{Binding TimeText}" FontWeight="SemiBold" />
+          <TextBlock Classes="caption" Text="Open now" VerticalAlignment="Center" IsVisible="{Binding IsCurrent}"
+                     Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+        </StackPanel>
+        <TextBlock Text="{Binding Summary}" IsVisible="{Binding HasSummary}" TextTrimming="CharacterEllipsis" />
+        <c:HighlightTextBlock MarkedText="{Binding Snippet}" TextWrapping="Wrap" MaxLines="3"
+                              TextTrimming="CharacterEllipsis"
+                              Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+      </StackPanel>
+    </DataTemplate>
+  </Window.Resources>
+
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+N" Command="{Binding NewEntryCommand}" />
     <KeyBinding Gesture="Ctrl+F" Command="{Binding ToggleSearchCommand}" />
+    <KeyBinding Gesture="Ctrl+D" Command="{Binding ToggleCalendarCommand}" />
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding OpenQuestionsCommand}" />
     <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveNowCommand}" />
   </Window.KeyBindings>
@@ -28,7 +63,16 @@
       <Grid ColumnDefinitions="230,12,*">
         <Border Classes="card" Padding="16,12">
           <StackPanel Spacing="1">
-            <TextBlock Text="{Binding ClockTime}" FontSize="26" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding ClockTime}" FontSize="26" FontWeight="SemiBold" />
+              <Border Grid.Column="1" CornerRadius="10" Padding="8,2" VerticalAlignment="Center"
+                      Background="{DynamicResource SystemFillColorAttentionBackgroundBrush}"
+                      IsVisible="{Binding StreakText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                      ToolTip.Tip="Days in a row you've written something">
+                <TextBlock Classes="caption" Text="{Binding StreakText}"
+                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" />
+              </Border>
+            </Grid>
             <TextBlock Classes="secondary" Text="{Binding ClockDate}" />
             <TextBlock Classes="caption" Margin="0,6,0,0" Text="{Binding EntryStamp}"
                        TextWrapping="Wrap" />
@@ -59,8 +103,8 @@
         </Grid>
       </Button>
 
-      <!-- Main area: editor, or search -->
-      <Grid Grid.Row="2" RowDefinitions="Auto,*">
+      <!-- Main area: editor, search or calendar -->
+      <Grid Grid.Row="2" RowDefinitions="Auto,Auto,*">
         <fa:FAInfoBar Severity="Informational" Margin="0,0,0,12"
                       Title="Today's check-in" Message="You haven't answered today's questions yet."
                       IsOpen="{Binding ShowReminder, Mode=OneWay}" IsClosable="True"
@@ -70,7 +114,24 @@
           </fa:FAInfoBar.ActionButton>
         </fa:FAInfoBar>
 
-        <Border Grid.Row="1" Classes="card" Padding="0" IsVisible="{Binding !IsSearchOpen}">
+        <!-- On this day: only on a fresh, unstarted entry -->
+        <Border Grid.Row="1" Classes="card" Padding="14,10" Margin="0,0,0,12" IsVisible="{Binding ShowMemory}">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+            <fa:FASymbolIcon Symbol="CalendarDay" FontSize="18" VerticalAlignment="Center"
+                             Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            <StackPanel Grid.Column="1" Margin="12,0" Spacing="1" VerticalAlignment="Center">
+              <TextBlock Classes="caption" Text="{Binding MemoryTitle}" />
+              <TextBlock Text="{Binding MemoryText}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <Button Grid.Column="2" Content="Read it" Command="{Binding OpenMemoryCommand}" VerticalAlignment="Center" />
+            <Button Grid.Column="3" Classes="subtle" Margin="4,0,0,0" Padding="8" VerticalAlignment="Center"
+                    Command="{Binding DismissMemoryCommand}" ToolTip.Tip="Hide for today">
+              <fa:FASymbolIcon Symbol="Dismiss" FontSize="12" />
+            </Button>
+          </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Classes="card" Padding="0" IsVisible="{Binding IsEditorOpen}">
           <Grid RowDefinitions="*,Auto">
             <TextBox Classes="bare editor" Name="Editor" Text="{Binding Body}" Margin="24,20,24,8"
                      PlaceholderText="Write whatever's on your mind. It saves itself." />
@@ -101,7 +162,7 @@
           </Grid>
         </Border>
 
-        <Panel Grid.Row="1" IsVisible="{Binding IsSearchOpen}">
+        <Panel Grid.Row="2" IsVisible="{Binding IsSearchOpen}">
         <Border Classes="card" Padding="20,16" DataContext="{Binding Search}" x:DataType="vm:SearchViewModel">
           <Grid RowDefinitions="Auto,Auto,Auto,*">
             <Grid ColumnDefinitions="*,Auto">
@@ -132,34 +193,90 @@
 
             <TextBlock Grid.Row="2" Classes="caption" Margin="2,14,0,6" Text="{Binding ResultSummary}" />
 
-            <ListBox Grid.Row="3" Classes="results" Name="ResultsList" ItemsSource="{Binding Results}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:SearchResultItem">
-                  <Grid ColumnDefinitions="150,*">
-                    <StackPanel Spacing="2">
-                      <TextBlock Text="{Binding DateText}" FontWeight="SemiBold" />
-                      <TextBlock Classes="caption" Text="{Binding TimeText}" />
-                      <TextBlock Classes="caption" Text="Open now" IsVisible="{Binding IsCurrent}"
-                                 Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="2">
-                      <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" IsVisible="{Binding HasSummary}"
-                                 TextTrimming="CharacterEllipsis" />
-                      <c:HighlightTextBlock MarkedText="{Binding Snippet}" TextWrapping="Wrap" MaxLines="2"
-                                            TextTrimming="CharacterEllipsis"
-                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
+            <ListBox Grid.Row="3" Classes="results" Name="ResultsList" ItemsSource="{Binding Results}"
+                     ItemTemplate="{StaticResource EntryResultTemplate}" />
           </Grid>
         </Border>
         </Panel>
+
+        <Border Grid.Row="2" Classes="card" Padding="20,16" IsVisible="{Binding IsCalendarOpen}">
+          <Grid ColumnDefinitions="*,20,280" DataContext="{Binding Calendar}" x:DataType="vm:CalendarViewModel">
+            <Grid RowDefinitions="Auto,Auto,*">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="subtitle" Text="{Binding MonthTitle}" />
+                  <TextBlock Classes="caption" Text="{Binding MonthSummary}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <Button Classes="subtle" Padding="8" Command="{Binding PreviousMonthCommand}" ToolTip.Tip="Previous month">
+                    <fa:FASymbolIcon Symbol="ChevronLeft" FontSize="14" />
+                  </Button>
+                  <Button Content="Today" Command="{Binding ThisMonthCommand}" />
+                  <Button Classes="subtle" Padding="8" Command="{Binding NextMonthCommand}" ToolTip.Tip="Next month">
+                    <fa:FASymbolIcon Symbol="ChevronRight" FontSize="14" />
+                  </Button>
+                  <Button Name="CloseCalendarButton" Margin="8,0,0,0" ToolTip.Tip="Close calendar (Esc)">
+                    <fa:FASymbolIcon Symbol="Dismiss" FontSize="14" />
+                  </Button>
+                </StackPanel>
+              </Grid>
+
+              <ItemsControl Grid.Row="1" Margin="0,14,0,4" ItemsSource="{Binding Weekdays}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <UniformGrid Columns="7" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Classes="caption" Text="{Binding}" HorizontalAlignment="Center" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <ItemsControl Grid.Row="2" Name="CalendarDays" ItemsSource="{Binding Days}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <UniformGrid Columns="7" Rows="6" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CalendarDay">
+                    <Button Classes="day" Classes.selected="{Binding IsSelected}" Classes.today="{Binding IsToday}"
+                            Classes.outside="{Binding !IsInMonth}" ToolTip.Tip="{Binding Tooltip}"
+                            Command="{Binding $parent[ItemsControl].((vm:CalendarViewModel)DataContext).SelectDayCommand}"
+                            CommandParameter="{Binding}">
+                      <Grid RowDefinitions="Auto,*">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Text="{Binding Number}" FontSize="13" />
+                          <fa:FASymbolIcon Grid.Column="1" Symbol="Checkmark" FontSize="10" IsVisible="{Binding CheckedIn}"
+                                           Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                        </Grid>
+                        <Ellipse Grid.Row="1" Width="{Binding DotSize}" Height="{Binding DotSize}"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 Fill="{DynamicResource AccentFillColorDefaultBrush}" IsVisible="{Binding HasEntries}" />
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Grid>
+
+            <Border Grid.Column="2" Classes="layer" Padding="12">
+              <Grid RowDefinitions="Auto,Auto,*">
+                <TextBlock Classes="body-strong" Margin="4,0,0,8" Text="{Binding SelectedTitle}" />
+                <TextBlock Grid.Row="1" Classes="caption" Margin="4,0" Text="Nothing written this day."
+                           IsVisible="{Binding SelectedIsEmpty}" />
+                <ListBox Grid.Row="2" Classes="results" Name="DayList" ItemsSource="{Binding DayEntries}"
+                         ItemTemplate="{StaticResource CompactEntryTemplate}" />
+              </Grid>
+            </Border>
+          </Grid>
+        </Border>
       </Grid>
 
       <!-- Right column -->
-      <Grid Grid.Row="2" Grid.Column="2" RowDefinitions="96,12,96,*,Auto">
+      <Grid Grid.Row="2" Grid.Column="2" RowDefinitions="84,10,84,10,84,*,Auto">
         <Button Classes="tile accent" Command="{Binding NewEntryCommand}" ToolTip.Tip="Start a new entry (Ctrl+N)">
           <StackPanel Spacing="6">
             <fa:FASymbolIcon Symbol="Add" FontSize="22" HorizontalAlignment="Left" />
@@ -172,10 +289,16 @@
             <TextBlock Text="Search entries" FontWeight="SemiBold" />
           </StackPanel>
         </Button>
-        <StackPanel Grid.Row="4" Spacing="6">
+        <Button Grid.Row="4" Classes="tile" Command="{Binding ToggleCalendarCommand}" ToolTip.Tip="Calendar (Ctrl+D)">
+          <StackPanel Spacing="6">
+            <fa:FASymbolIcon Symbol="CalendarMonth" FontSize="22" HorizontalAlignment="Left" />
+            <TextBlock Text="Calendar" FontWeight="SemiBold" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Row="6" Spacing="6">
           <Button Classes="tile" Height="44" Command="{Binding OpenTrendsCommand}">
             <StackPanel Orientation="Horizontal" Spacing="12">
-              <fa:FASymbolIcon Symbol="CalendarMonth" FontSize="16" />
+              <fa:FASymbolIcon Symbol="Target" FontSize="16" />
               <TextBlock Text="Trends" />
             </StackPanel>
           </Button>

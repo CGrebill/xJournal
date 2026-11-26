@@ -85,6 +85,40 @@ public sealed class EntryRepository(JournalDatabase db, IClock clock)
             .ToList();
     }
 
+    // ------------------------------------------------------------------ activity by day
+
+    /// <summary>
+    /// Entries and words per local calendar day (in the clock's time zone, like search), for days
+    /// that have at least one entry. Both bounds are inclusive; null means unbounded.
+    /// </summary>
+    public IReadOnlyDictionary<DateOnly, DayActivity> GetDayActivity(DateOnly? from = null, DateOnly? to = null)
+    {
+        var fromUtc = from is { } f ? DbTime.Utc(clock.StartOfDay(f)) : long.MinValue;
+        var toUtc = to is { } t ? DbTime.Utc(clock.StartOfDay(t.AddDays(1))) : long.MaxValue;
+        var rows = db.Connection.Query<(long CreatedUtc, string Body)>(
+            "SELECT created_utc, body FROM entries WHERE created_utc >= $fromUtc AND created_utc < $toUtc",
+            new { fromUtc, toUtc });
+
+        var days = new Dictionary<DateOnly, DayActivity>();
+        foreach (var (createdUtc, body) in rows)
+        {
+            var day = clock.LocalDay(DateTimeOffset.FromUnixTimeMilliseconds(createdUtc));
+            var words = Insights.WordCounter.Count(body);
+            days[day] = days.TryGetValue(day, out var a) ? a with { Entries = a.Entries + 1, Words = a.Words + words } : new DayActivity(day, 1, words);
+        }
+        return days;
+    }
+
+    /// <summary>The local day of the earliest entry, or null if there are none.</summary>
+    public DateOnly? GetFirstDay() =>
+        db.Connection.ExecuteScalar<long?>("SELECT min(created_utc) FROM entries") is { } utc
+            ? clock.LocalDay(DateTimeOffset.FromUnixTimeMilliseconds(utc))
+            : null;
+
+    /// <summary>Entries written on one local calendar day, oldest first.</summary>
+    public IReadOnlyList<JournalEntry> GetForDay(DateOnly day) =>
+        Search(new EntryQuery(null, day, day)).Select(r => r.Entry).Reverse().ToList();
+
     // ------------------------------------------------------------------ previous versions
 
     private const string RevisionColumns =

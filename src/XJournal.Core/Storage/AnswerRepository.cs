@@ -22,6 +22,16 @@ public sealed class AnswerRepository(JournalDatabase db)
             "SELECT EXISTS (SELECT 1 FROM answer_sets s JOIN answers a ON a.answer_set_id = s.id WHERE s.day = $day)",
             new { day = DbTime.Day(day) });
 
+    /// <summary>Days (inclusive range) that have at least one check-in answer.</summary>
+    public IReadOnlySet<DateOnly> GetAnsweredDays(DateOnly from, DateOnly to) =>
+        db.Connection.Query<string>(
+                """
+                SELECT DISTINCT s.day FROM answer_sets s JOIN answers a ON a.answer_set_id = s.id
+                WHERE s.day >= $from AND s.day <= $to
+                """,
+                new { from = DbTime.Day(from), to = DbTime.Day(to) })
+            .Select(DbTime.ParseDay).ToHashSet();
+
     /// <summary>
     /// Saves (creating or replacing) the answers for a day. The set stays linked to the entry it was
     /// first linked to; <paramref name="entryId"/> only fills the link if there is none yet.
