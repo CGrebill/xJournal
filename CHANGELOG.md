@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (unreleased)
+## 1.1.0 (2026-11-26)
 
 **New**
 - Check-in questions can now be different types: a 1–10 **scale** (with optional words for each end), a labeled **rating** (the agree/disagree style from before), **yes/no**, multiple **choice** with your own options (pick one, or several), a **number** with an optional unit, or a short **text** answer.
