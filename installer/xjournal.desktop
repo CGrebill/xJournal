@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=xJournal
+Comment=A private, automatic journal
+Exec=xJournal
+Icon=xjournal
+Terminal=false
+Categories=Office;Utility;

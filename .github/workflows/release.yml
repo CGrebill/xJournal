@@ -1,0 +1,148 @@
+name: Release
+
+# Pushing a tag like v1.0.0 builds every download and publishes a GitHub Release.
+# Changes to the packaging (or a manual run) build the downloads without releasing,
+# so they can be checked first.
+on:
+  push:
+    tags: ['v*']
+    branches: ['**']
+    paths: ['installer/**', '.github/workflows/release.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  PROJECT: src/XJournal.App/XJournal.App.csproj
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)
+          if [[ "$GITHUB_REF" == refs/tags/v* && "${GITHUB_REF#refs/tags/v}" != "$version" ]]; then
+            echo "::error::Tag ${GITHUB_REF#refs/tags/} doesn't match <Version>$version</Version>"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Test
+        run: dotnet test -c Release
+      - name: Publish (installer layout and portable single file)
+        shell: pwsh
+        run: |
+          dotnet publish $env:PROJECT -c Release -r win-x64 --self-contained -o publish/win-x64
+          dotnet publish $env:PROJECT -c Release -r win-x64 --self-contained -o publish/portable `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item LICENSE.md, README.md publish/portable/
+          Compress-Archive -Path publish/portable/xJournal.exe, publish/portable/LICENSE.md, publish/portable/README.md `
+            -DestinationPath "dist/xJournal-$env:VERSION-win-x64-portable.zip"
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          & $iscc /DAppVersion=$env:VERSION /DSourceDir="$pwd\publish\win-x64" /DOutputDir="$pwd\dist" installer\xjournal.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish
+        run: |
+          dotnet publish "$PROJECT" -c Release -r linux-x64 --self-contained -o "publish/xJournal-$VERSION" \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none
+          cp LICENSE.md README.md installer/xjournal.desktop src/XJournal.App/Assets/xjournal.png "publish/xJournal-$VERSION/"
+          mkdir -p dist
+          tar -C publish -czf "dist/xJournal-$VERSION-linux-x64.tar.gz" "xJournal-$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    strategy:
+      matrix:
+        rid: [osx-arm64, osx-x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish and build xJournal.app
+        run: |
+          dotnet publish "$PROJECT" -c Release -r ${{ matrix.rid }} --self-contained -o publish/${{ matrix.rid }} -p:DebugType=none
+          mkdir -p app dist
+          installer/make-macos-app.sh publish/${{ matrix.rid }} "$VERSION" app
+          cp LICENSE.md app/
+          suffix=$([ "${{ matrix.rid }}" = "osx-arm64" ] && echo "macos-apple-silicon" || echo "macos-intel")
+          (cd app && ditto -c -k --keepParent xJournal.app "../dist/xJournal-$VERSION-$suffix.zip")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.rid }}
+          path: dist/*
+
+  release:
+    needs: [version, windows, linux, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and release notes
+        run: |
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+          awk -v v="## $VERSION" '$0 ~ "^## " { if (found) exit; if (index($0, v) == 1) { found = 1; next } } found' CHANGELOG.md > notes.md
+          cat >> notes.md <<'NOTES'
+
+          ## Downloads
+          - **Windows:** `…-win-x64-setup.exe` installs xJournal for your user (no admin needed). `…-portable.zip` is a single exe you can run from anywhere.
+          - **macOS:** unzip and move xJournal to Applications. It isn't notarized by Apple, so the first time, right-click it and choose **Open** (or allow it in System Settings → Privacy & Security).
+          - **Linux:** extract the archive and run `./xJournal`.
+
+          Your journals are stored separately from the app, so updating or uninstalling never removes them.
+          NOTES
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: xJournal ${{ env.VERSION }}
+          body_path: notes.md
+          files: dist/*

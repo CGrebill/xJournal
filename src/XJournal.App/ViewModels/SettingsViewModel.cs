@@ -37,6 +37,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public string Username => _journal.Username;
     public string JournalLocation => _journal.Database.FilePath;
+    public static string AboutText => $"xJournal {JournalTransfer.AppVersion} · Copyright 2026 CGrebill · PolyForm Noncommercial License 1.0.0";
     public IReadOnlyList<string> Themes { get; } = ["Use system setting", "Light", "Dark"];
 
     // ------------------------------------------------------------------ appearance & entries

@@ -182,6 +182,7 @@
             <Button Grid.Column="2" Content="Sign out" Command="{Binding SignOutCommand}" />
           </Grid>
         </Border>
+        <TextBlock Classes="caption" Margin="4,16,0,0" Text="{x:Static vm:SettingsViewModel.AboutText}" TextWrapping="Wrap" />
       </StackPanel>
     </ScrollViewer>
   </Grid>

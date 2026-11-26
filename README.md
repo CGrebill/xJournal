@@ -6,6 +6,21 @@ A private desktop journal that runs itself. Sign in and start typing. Entries ar
 
 Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](https://github.com/amwx/FluentAvalonia), so it has a Windows 11 (WinUI-style) look with Mica, and it runs on Windows, macOS and Linux.
 
+## Download
+
+Get the latest version from the [Releases page](https://github.com/CGrebill/xJournal/releases/latest).
+
+| System | Download | How to install |
+| --- | --- | --- |
+| Windows 10/11 | `xJournal-<version>-win-x64-setup.exe` | Run it. It installs for your user only (no admin rights), adds a Start menu entry and an uninstaller. |
+| Windows, no install | `xJournal-<version>-win-x64-portable.zip` | Unzip and run `xJournal.exe`, e.g. from a USB stick. |
+| macOS 12+ | `…-macos-apple-silicon.zip` or `…-macos-intel.zip` | Unzip and drag **xJournal** to Applications. It isn't notarized by Apple, so the first time, right-click it and choose **Open**. |
+| Linux (x64) | `xJournal-<version>-linux-x64.tar.gz` | Extract it and run `./xJournal`. A `.desktop` file and icon are included. |
+
+The downloads aren't code-signed yet, so Windows SmartScreen may say "Windows protected your PC". Choose **More info → Run anyway**. `SHA256SUMS.txt` on each release lets you check a download is intact.
+
+Your journals are stored separately from the app (see [Where your data lives](#where-your-data-lives)). Updating or uninstalling never touches them.
+
 ## Features
 
 - **Automatic entries.** Signing in reopens your last entry if you edited it in the last 30 minutes (configurable). Otherwise a new entry starts. An entry is stamped with the exact moment you start writing (date, time to the millisecond, and your UTC offset). It's saved 1.5 s after you stop typing, and also when you switch entries, leave the window, sign out or close the app. Empty entries are never saved.
@@ -119,6 +134,17 @@ Each journal is a single SQLite database. Entries, the search index, questions, 
 - An encrypted backup (`.xjbackup`) opens with your password at the time of the backup, or with a separate password you choose when exporting.
 - The readable JSON export and the Markdown export are **not** encrypted. The app warns you before writing either.
 
+## Releasing a new version
+
+1. Update `<Version>` in `Directory.Build.props` and add a section to `CHANGELOG.md`.
+2. Commit, then tag and push: `git tag v1.2.3 && git push origin v1.2.3`.
+
+The Release workflow (`.github/workflows/release.yml`) runs the tests, builds every download, and publishes a GitHub Release with the changelog section as its notes. Changing the packaging files builds the downloads without releasing, so they can be checked first.
+
+## License
+
+xJournal is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). You may use, copy and modify it for any noncommercial purpose (personal use, research, education, charities, public institutions). Commercial use needs separate permission from the author. Required Notice: Copyright 2026 CGrebill.
+
 ## Project layout
 
 ```
@@ -126,6 +152,7 @@ src/XJournal.Core     storage & encryption, entries & search, questions & answer
                       backup/import/merge, insights (stats, on this day), Markdown export (no UI)
 src/XJournal.App      Avalonia desktop app (views, view models, theme, charts)
 tests/                xUnit tests for the core and headless UI tests for the app
+installer/            Windows installer (Inno Setup), macOS app bundle script, Linux .desktop file
 tools/make_icon.py    draws the app icon
-.github/workflows     CI on Windows and Linux
+.github/workflows     CI on Windows and Linux; release builds for every platform
 ```
