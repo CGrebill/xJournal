@@ -33,6 +33,14 @@
     <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
+  <!-- Title strip at the top of each window (content is drawn into the title bar) -->
+  <Style Selector=":is(Control).titlebar">
+    <Setter Property="Margin" Value="16,0" />
+  </Style>
+  <!-- macOS draws its window buttons at the top left -->
+  <Style Selector="Window.macos :is(Control).titlebar">
+    <Setter Property="Margin" Value="80,0,16,0" />
+  </Style>
   <Style Selector="TextBlock.app-title">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="VerticalAlignment" Value="Center" />

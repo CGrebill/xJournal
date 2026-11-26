@@ -15,10 +15,14 @@ public interface IDialogs
     Task ShowMessageAsync(string title, string message);
 
     /// <returns>True if the primary button was chosen.</returns>
-    Task<bool> ConfirmAsync(string title, string message, string primaryText, string closeText = "Cancel", bool destructive = false);
+    Task<bool> ConfirmAsync(string title, string message, string primaryText, string closeText = "Cancel");
 
-    /// <summary>Shows arbitrary content in a dialog.</summary>
-    Task<bool> ShowContentAsync(string title, object content, string primaryText, string? closeText = "Cancel", Func<bool>? canClose = null);
+    /// <summary>
+    /// Shows arbitrary content in a dialog. <paramref name="canClose"/> runs when the primary button is
+    /// pressed; returning false keeps the dialog open (e.g. to show a validation message).
+    /// </summary>
+    Task<bool> ShowContentAsync(string title, object content, string primaryText, string? closeText = "Cancel",
+        Func<Task<bool>>? canClose = null);
 }
 
 public static class FileTypes
@@ -31,6 +35,11 @@ public static class FileTypes
 
 public sealed class WindowDialogs(Window window) : IDialogs
 {
+    // A window can show only one content dialog at a time; queue any others.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, SemaphoreSlim> Gates = new();
+
+    private SemaphoreSlim Gate => Gates.GetValue(window, _ => new SemaphoreSlim(1, 1));
+
     public async Task<string?> PickOpenFileAsync(string title, params FilePickerFileType[] types)
     {
         var files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -49,7 +58,7 @@ public sealed class WindowDialogs(Window window) : IDialogs
             Title = title,
             SuggestedFileName = suggestedName,
             FileTypeChoices = types,
-            DefaultExtension = types.FirstOrDefault()?.Patterns?.FirstOrDefault()?.TrimStart('*'),
+            DefaultExtension = types.Length > 0 && types[0].Patterns is [var pattern, ..] ? pattern.TrimStart('*') : null,
             ShowOverwritePrompt = true,
         });
         return file?.TryGetLocalPath();
@@ -64,10 +73,25 @@ public sealed class WindowDialogs(Window window) : IDialogs
     public Task ShowMessageAsync(string title, string message) =>
         ShowContentAsync(title, Text(message), "OK", closeText: null);
 
-    public Task<bool> ConfirmAsync(string title, string message, string primaryText, string closeText = "Cancel", bool destructive = false) =>
+    public Task<bool> ConfirmAsync(string title, string message, string primaryText, string closeText = "Cancel") =>
         ShowContentAsync(title, Text(message), primaryText, closeText);
 
-    public async Task<bool> ShowContentAsync(string title, object content, string primaryText, string? closeText = "Cancel", Func<bool>? canClose = null)
+    public async Task<bool> ShowContentAsync(string title, object content, string primaryText, string? closeText = "Cancel",
+        Func<Task<bool>>? canClose = null)
+    {
+        await Gate.WaitAsync();
+        try
+        {
+            return await ShowCoreAsync(title, content, primaryText, closeText, canClose);
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
+    private async Task<bool> ShowCoreAsync(string title, object content, string primaryText, string? closeText,
+        Func<Task<bool>>? canClose)
     {
         var dialog = new FAContentDialog
         {
@@ -79,7 +103,18 @@ public sealed class WindowDialogs(Window window) : IDialogs
         };
         if (canClose is not null)
         {
-            dialog.PrimaryButtonClick += (_, args) => args.Cancel = !canClose();
+            dialog.PrimaryButtonClick += async (_, args) =>
+            {
+                var deferral = args.GetDeferral();
+                try
+                {
+                    args.Cancel = !await canClose();
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+            };
         }
         var result = await dialog.ShowAsync(window);
         return result == FAContentDialogResult.Primary;

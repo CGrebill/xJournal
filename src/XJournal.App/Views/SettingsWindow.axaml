@@ -19,7 +19,7 @@
   </Window.Styles>
 
   <Grid RowDefinitions="36,*">
-    <TextBlock Classes="app-title" Margin="16,0" Text="Settings" IsHitTestVisible="False" />
+    <TextBlock Classes="app-title titlebar" Text="Settings" IsHitTestVisible="False" />
 
     <ScrollViewer Grid.Row="1" Padding="24,0,24,24">
       <StackPanel Spacing="4">

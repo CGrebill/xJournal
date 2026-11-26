@@ -286,7 +286,7 @@ public static class JournalMerger
     private static List<VersionRow> ReadVersions(SqliteConnection c, SqliteTransaction? t) =>
         c.Query<VersionRow>("SELECT id, question_id, content_hash, created_utc FROM question_versions", transaction: t).ToList();
 
-    private static IEnumerable<SetRow> ReadAnswerSets(SqliteConnection c, SqliteTransaction? t)
+    private static List<SetRow> ReadAnswerSets(SqliteConnection c, SqliteTransaction? t)
     {
         var sets = c.Query<SetRow>("SELECT id, day, answered_utc FROM answer_sets", transaction: t).ToList();
         var answers = c.Query<(long SetId, long VersionId, long Value)>(

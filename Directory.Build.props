@@ -7,5 +7,6 @@
     <Company>xJournal</Company>
     <Product>xJournal</Product>
     <Version>0.1.0</Version>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
 </Project>

@@ -41,6 +41,7 @@ public sealed partial class ImportJournalViewModel : ViewModelBase
     [ObservableProperty] public partial string NewPassword { get; set; } = "";
     [ObservableProperty] public partial string ConfirmNewPassword { get; set; } = "";
     [ObservableProperty] public partial string? Error { get; set; }
+    [ObservableProperty] public partial bool IsBusy { get; set; }
 
     public bool IsUnlocked => Summary is not null;
     public bool TargetExists => _accounts.FindAccount(TargetUsername ?? "") is not null;
@@ -53,22 +54,29 @@ public sealed partial class ImportJournalViewModel : ViewModelBase
               $"{s.QuestionCount} question{(s.QuestionCount == 1 ? "" : "s")} · {s.AnsweredDays} day{(s.AnsweredDays == 1 ? "" : "s")} of answers";
 
     [RelayCommand]
-    private void Unlock()
+    private async Task UnlockAsync()
     {
-        if (IsJson) return;
+        if (IsJson || IsBusy) return;
         Error = null;
         if (BackupPassword.Length == 0) { Error = "Enter the backup's password."; return; }
+        IsBusy = true;
         try
         {
-            Summary = JournalTransfer.InspectBackup(FilePath, BackupPassword);
+            // Deriving the key is deliberately slow; keep the dialog responsive.
+            var (path, password) = (FilePath, BackupPassword);
+            Summary = await Task.Run(() => JournalTransfer.InspectBackup(path, password));
         }
         catch (InvalidPasswordException)
         {
             Error = "That password doesn't open this backup.";
         }
-        catch (JournalException ex)
+        catch (Exception ex) when (Services.Errors.IsExpected(ex))
         {
             Error = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
@@ -78,19 +86,19 @@ public sealed partial class ImportJournalViewModel : ViewModelBase
         {
             Summary = JournalTransfer.InspectJson(FilePath);
         }
-        catch (JournalException ex)
+        catch (Exception ex) when (Services.Errors.IsExpected(ex))
         {
             Error = ex.Message;
         }
     }
 
     /// <summary>Checks the form; returns false (and shows why) if the import can't run yet.</summary>
-    public bool Validate()
+    public async Task<bool> ValidateAsync()
     {
         Error = null;
         if (!IsUnlocked)
         {
-            if (IsBackup) Unlock();
+            if (IsBackup) await UnlockAsync();
             if (!IsUnlocked) { Error ??= "Unlock the backup first."; return false; }
         }
         if (AccountStore.ValidateUsername(TargetUsername) is { } usernameError) { Error = usernameError; return false; }

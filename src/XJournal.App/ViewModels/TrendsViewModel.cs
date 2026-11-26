@@ -28,7 +28,7 @@ public sealed partial class TrendsViewModel : ViewModelBase
         _openEntry = openEntry;
         Questions = journal.Questions.GetAll(includeArchived: true).Select(q => new TrendQuestion(q)).ToList();
         SelectedRange = Ranges[1];
-        SelectedQuestion = Questions.FirstOrDefault();
+        SelectedQuestion = Questions.Count > 0 ? Questions[0] : null;
     }
 
     public IReadOnlyList<TrendQuestion> Questions { get; }

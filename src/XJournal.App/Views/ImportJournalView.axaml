@@ -16,7 +16,10 @@
       <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding !IsUnlocked}">
         <TextBox Text="{Binding BackupPassword}" PasswordChar="●" Classes="revealPasswordButton"
                  PlaceholderText="The password the backup was made with" />
-        <Button Grid.Column="1" Margin="8,0,0,0" Content="Unlock" Command="{Binding UnlockCommand}" />
+        <Panel Grid.Column="1" Margin="8,0,0,0">
+          <Button Content="Unlock" Command="{Binding UnlockCommand}" IsVisible="{Binding !IsBusy}" />
+          <fa:FAProgressRing IsIndeterminate="True" Width="20" Height="20" IsVisible="{Binding IsBusy}" />
+        </Panel>
       </Grid>
     </StackPanel>
 

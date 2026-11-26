@@ -13,7 +13,7 @@
   </Window.KeyBindings>
 
   <Grid RowDefinitions="36,Auto,*,Auto">
-    <TextBlock Classes="app-title" Margin="16,0" Text="Today's check-in" IsHitTestVisible="False" />
+    <TextBlock Classes="app-title titlebar" Text="Today's check-in" IsHitTestVisible="False" />
 
     <Grid Grid.Row="1" Margin="24,8,24,12" ColumnDefinitions="*,Auto">
       <StackPanel Spacing="2">

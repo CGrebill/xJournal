@@ -129,7 +129,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     {
         var options = new ExportBackupViewModel();
         var view = new Views.ExportBackupView { DataContext = options };
-        if (!await _dialogs.ShowContentAsync("Export encrypted backup", view, "Choose location…", "Cancel", options.Validate))
+        if (!await _dialogs.ShowContentAsync("Export encrypted backup", view, "Choose location…", "Cancel", () => Task.FromResult(options.Validate())))
             return;
 
         var path = await _dialogs.PickSaveFileAsync("Save encrypted backup",
@@ -141,7 +141,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             await _dialogs.ShowMessageAsync("Backup saved",
                 $"Your journal was saved to:\n{path}\n\nTo use it on another computer, choose \"Import a journal from a backup\" on the sign-in screen.");
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JournalException)
+        catch (Exception ex) when (Errors.IsExpected(ex))
         {
             await _dialogs.ShowMessageAsync("Couldn't save the backup", ex.Message);
         }
@@ -155,7 +155,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
         var merge = new MergeJournalViewModel(_journal, path);
         var view = new Views.MergeJournalView { DataContext = merge };
-        if (!await _dialogs.ShowContentAsync("Merge in a journal", view, "Merge", "Cancel", merge.Validate)) return;
+        if (!await _dialogs.ShowContentAsync("Merge in a journal", view, "Merge", "Cancel", merge.ValidateAsync)) return;
 
         try
         {
@@ -166,7 +166,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             var lines = string.Join("\n", MergeJournalViewModel.Describe(result).Select(l => "• " + l));
             await _dialogs.ShowMessageAsync("Journals merged", lines.Length > 0 ? lines : "Nothing needed to change.");
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JournalException or Microsoft.Data.Sqlite.SqliteException)
+        catch (Exception ex) when (Errors.IsExpected(ex))
         {
             await _dialogs.ShowMessageAsync("The merge didn't complete",
                 "Your journal wasn't changed.\n\n" + ex.Message);
@@ -187,7 +187,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         {
             JournalTransfer.ExportJson(_journal, path);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (Errors.IsExpected(ex))
         {
             await _dialogs.ShowMessageAsync("Couldn't save the export", ex.Message);
         }
@@ -219,7 +219,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
         try
         {
             var current = CurrentPassword;
-            if (!await Task.Run(() => _journal.Database.CheckPassword(current)))
+            var correct = await Task.Run(() => _journal.Database.CheckPassword(current));
+            if (_journal.IsDisposed) return; // signed out meanwhile
+            if (!correct)
             {
                 SetPasswordStatus("Your current password is incorrect.", isError: true);
                 return;

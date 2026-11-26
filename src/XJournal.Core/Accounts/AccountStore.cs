@@ -25,6 +25,24 @@ public sealed class AccountStore
     {
         RootDirectory = rootDirectory ?? DefaultRootDirectory;
         Clock = clock ?? SystemClock.Instance;
+        DeleteStaleTempFiles();
+    }
+
+    /// <summary>Removes leftovers of imports that were interrupted (e.g. by a crash or power cut).</summary>
+    private void DeleteStaleTempFiles()
+    {
+        if (!Directory.Exists(UsersDirectory)) return;
+        foreach (var file in Directory.EnumerateFiles(UsersDirectory, ".import-*.tmp"))
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddDays(-1)) File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Best effort; it will be retried next time.
+            }
+        }
     }
 
     public static string DefaultRootDirectory =>
@@ -112,11 +130,12 @@ public sealed class AccountStore
             safetyCopy = Path.Combine(SafetyBackupsDirectory,
                 $"{existing}-replaced-{Clock.LocalNow():yyyyMMdd-HHmmss}{BackupExtension}");
             File.Copy(PathFor(existing), safetyCopy, overwrite: true);
-            File.Delete(PathFor(existing));
         }
 
+        // Replace in one step, so there is never a moment without a journal file.
+        // (An existing account keeps its original spelling; FindAccount ignores case.)
         Directory.CreateDirectory(UsersDirectory);
-        File.Move(preparedFile, PathFor(username));
+        File.Move(preparedFile, PathFor(existing ?? username), overwrite: true);
         return safetyCopy;
     }
 

@@ -12,7 +12,7 @@ public sealed partial class ChoiceViewModel(QuestionItemViewModel owner, int val
 {
     public int Value { get; } = value;
     public string Label { get; } = label;
-    public string Number { get; } = value.ToString();
+    public string Number { get; } = value.ToString(System.Globalization.CultureInfo.CurrentCulture);
     public string Group => owner.Group;
 
     public bool IsSelected
@@ -70,7 +70,7 @@ public sealed partial class QuestionsViewModel : ViewModelBase
         _dialogs = dialogs;
         _currentEntryId = currentEntryId;
         _day = journal.Clock.Today();
-        DateText = _day.ToString("dddd, MMMM d, yyyy");
+        DateText = _day.ToString("dddd, MMMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture);
         Load();
     }
 
@@ -125,7 +125,7 @@ public sealed partial class QuestionsViewModel : ViewModelBase
             _journal.Answers.SaveForDay(_day, _currentEntryId(), values, now);
             Status = $"Saved {now:t}";
         }
-        catch (Exception ex)
+        catch (Exception ex) when (Errors.IsExpected(ex))
         {
             Status = "Couldn't save: " + ex.Message;
         }
@@ -162,7 +162,7 @@ public static class QuestionImportFlow
         {
             parsed = Core.Questions.QuestionFileParser.ParseFile(path);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             await dialogs.ShowMessageAsync("Couldn't read the file", ex.Message);
             return false;
@@ -181,23 +181,46 @@ public static class QuestionImportFlow
         if (!await dialogs.ShowContentAsync("Import questions", view, "Import", "Cancel")) return false;
         if (!preview.Plan.HasChanges) return false;
 
-        journal.QuestionImporter.Apply(preview.Plan);
+        if (journal.IsDisposed) return false;
+        try
+        {
+            journal.QuestionImporter.Apply(preview.Plan);
+        }
+        catch (Exception ex) when (Errors.IsExpected(ex))
+        {
+            await dialogs.ShowMessageAsync("The import didn't complete", "Nothing was changed.\n\n" + ex.Message);
+            return false;
+        }
         return true;
     }
 
     public static async Task ExportAsync(Journal journal, IDialogs dialogs)
     {
         var path = await dialogs.PickSaveFileAsync("Export questions", "questions.json", FileTypes.QuestionJson);
-        if (path is null) return;
-        await File.WriteAllTextAsync(path, journal.QuestionImporter.Export().ToJson());
+        if (path is null || journal.IsDisposed) return;
+        try
+        {
+            await File.WriteAllTextAsync(path, journal.QuestionImporter.Export().ToJson());
+        }
+        catch (Exception ex) when (Errors.IsExpected(ex))
+        {
+            await dialogs.ShowMessageAsync("Couldn't save the file", ex.Message);
+        }
     }
 
     public static async Task SaveSampleAsync(IDialogs dialogs)
     {
         var path = await dialogs.PickSaveFileAsync("Save sample question file", "sample-questions.json", FileTypes.QuestionJson);
         if (path is null) return;
-        await using var source = AssetLoader.Open(new Uri("avares://xJournal/Assets/sample-questions.json"));
-        await using var target = File.Create(path);
-        await source.CopyToAsync(target);
+        try
+        {
+            await using var source = AssetLoader.Open(new Uri("avares://xJournal/Assets/sample-questions.json"));
+            await using var target = File.Create(path);
+            await source.CopyToAsync(target);
+        }
+        catch (Exception ex) when (Errors.IsExpected(ex))
+        {
+            await dialogs.ShowMessageAsync("Couldn't save the file", ex.Message);
+        }
     }
 }

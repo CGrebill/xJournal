@@ -88,22 +88,25 @@ public sealed class JournalTransfer(AccountStore accounts)
 
     // ---------------------------------------------------------------- inspect
 
-    /// <summary>Opens an encrypted backup read-only and summarises it.</summary>
+    /// <summary>Opens an encrypted backup and summarises it. The backup file itself is never modified.</summary>
     /// <exception cref="InvalidPasswordException"/>
-    public static BackupSummary InspectBackup(string path, string password)
+    public static BackupSummary InspectBackup(string path, string password) => WithBackupCopy(path, password, Summarize);
+
+    /// <summary>
+    /// Runs <paramref name="read"/> against a temporary copy of a backup, so opening it (which may
+    /// upgrade its format) never touches the original file. The copy is always deleted.
+    /// </summary>
+    private static T WithBackupCopy<T>(string path, string password, Func<Journal, T> read)
     {
-        // Inspect a copy so the original is never touched (migration could otherwise write to it).
-        var temp = Path.Combine(Path.GetTempPath(), $"xjournal-inspect-{Guid.NewGuid():N}.tmp");
+        var temp = Path.Combine(Path.GetTempPath(), $"xjournal-{Guid.NewGuid():N}.tmp");
         File.Copy(path, temp);
         try
         {
-            using var database = JournalDatabase.Open(temp, password);
-            using var journal = new Journal("", database, SystemClock.Instance);
-            return Summarize(journal);
+            using var journal = new Journal("", JournalDatabase.Open(temp, password), SystemClock.Instance);
+            return read(journal);
         }
         finally
         {
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             File.Delete(temp);
         }
     }
@@ -162,7 +165,6 @@ public sealed class JournalTransfer(AccountStore accounts)
                 if (integrity != "ok") throw new JournalException($"The backup is damaged ({integrity}).");
                 if (newPassword is not null && newPassword != backupPassword) database.ChangePassword(newPassword);
             }
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             accounts.Install(temp, username, replaceExisting);
         }
         finally
@@ -182,7 +184,6 @@ public sealed class JournalTransfer(AccountStore accounts)
         {
             using (var database = JournalDatabase.Create(temp, password))
                 WriteExport(database, export);
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             accounts.Install(temp, username, replaceExisting);
         }
         finally
@@ -364,24 +365,9 @@ public sealed class JournalTransfer(AccountStore accounts)
         }
     }
 
-    /// <summary>Opens an encrypted backup (read from a temporary copy) and reads everything in it.</summary>
+    /// <summary>Opens an encrypted backup (via a temporary copy) and reads everything in it.</summary>
     /// <exception cref="InvalidPasswordException"/>
-    public static JournalExport ReadBackup(string path, string password)
-    {
-        var temp = Path.Combine(Path.GetTempPath(), $"xjournal-read-{Guid.NewGuid():N}.tmp");
-        File.Copy(path, temp);
-        try
-        {
-            using var database = JournalDatabase.Open(temp, password);
-            using var journal = new Journal("", database, SystemClock.Instance);
-            return BuildExport(journal);
-        }
-        finally
-        {
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-            File.Delete(temp);
-        }
-    }
+    public static JournalExport ReadBackup(string path, string password) => WithBackupCopy(path, password, BuildExport);
 
     // ---------------------------------------------------------------- automatic backups
 

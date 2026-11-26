@@ -30,6 +30,7 @@ public sealed partial class MergeJournalViewModel : ViewModelBase
     public partial MergePlan? Plan { get; set; }
 
     [ObservableProperty] public partial string? Error { get; set; }
+    [ObservableProperty] public partial bool IsBusy { get; set; }
 
     public bool IsUnlocked => Plan is not null;
     public bool HasChanges => Plan?.Summary.HasChanges == true;
@@ -37,11 +38,31 @@ public sealed partial class MergeJournalViewModel : ViewModelBase
     public IReadOnlyList<string> PreviewLines => Plan is null ? [] : Describe(Plan.Summary);
 
     [RelayCommand]
-    private void Unlock()
+    private async Task UnlockAsync()
     {
+        if (IsBusy) return;
         Error = null;
         if (BackupPassword.Length == 0) { Error = "Enter the backup's password."; return; }
-        Load(() => JournalTransfer.ReadBackup(FilePath, BackupPassword));
+        IsBusy = true;
+        try
+        {
+            // Deriving the key is deliberately slow; keep the dialog responsive.
+            var (path, password) = (FilePath, BackupPassword);
+            var incoming = await Task.Run(() => JournalTransfer.ReadBackup(path, password));
+            Load(() => incoming);
+        }
+        catch (InvalidPasswordException)
+        {
+            Error = "That password doesn't open this backup.";
+        }
+        catch (Exception ex) when (Services.Errors.IsExpected(ex))
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private void Load(Func<JournalExport> read)
@@ -54,20 +75,16 @@ public sealed partial class MergeJournalViewModel : ViewModelBase
         {
             Error = "That password doesn't open this backup.";
         }
-        catch (JournalException ex)
-        {
-            Error = ex.Message;
-        }
-        catch (IOException ex)
+        catch (Exception ex) when (Services.Errors.IsExpected(ex))
         {
             Error = "Couldn't read the file: " + ex.Message;
         }
     }
 
     /// <summary>The dialog's Merge button: unlocks first if needed; only closes when there's something to merge.</summary>
-    public bool Validate()
+    public async Task<bool> ValidateAsync()
     {
-        if (!IsUnlocked && IsBackup) Unlock();
+        if (!IsUnlocked && IsBackup) await UnlockAsync();
         if (!IsUnlocked) { Error ??= "Unlock the backup first."; return false; }
         if (!HasChanges) { Error = "Everything in this file is already in your journal."; return false; }
         return true;

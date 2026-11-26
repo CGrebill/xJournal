@@ -31,5 +31,12 @@ public sealed class Journal : IDisposable
     /// <summary>Where automatic safety copies go before risky operations (e.g. merging), if known.</summary>
     public string? SafetyBackupsDirectory { get; }
 
-    public void Dispose() => Database.Dispose();
+    /// <summary>True once the journal has been closed (e.g. after signing out).</summary>
+    public bool IsDisposed { get; private set; }
+
+    public void Dispose()
+    {
+        IsDisposed = true;
+        Database.Dispose();
+    }
 }

@@ -2,7 +2,8 @@
   // xJournal question file.
   // - "id" must never change for a question: answers are tracked by it.
   //   Rewording a question (same id, new text) keeps its history; the old wording is remembered.
-  // - Leaving a question out of a later import archives it (its answers are kept).
+  // - When you import a file that replaces your question set (the default), questions left out
+  //   of it are archived: hidden from the check-in, with their answers kept.
   // - "scale" lists the 5 answer labels from lowest (1) to highest (5). It can be set for the
   //   whole file and overridden per question.
   "version": 1,

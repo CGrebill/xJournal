@@ -16,6 +16,16 @@ Built with .NET 10 and [Avalonia](https://avaloniaui.net/) + [FluentAvalonia](ht
 - **Writing on more than one computer.** Merge a backup from another computer into your journal (see below).
 - **Previous versions.** When a merge replaces an entry's text, the old text is kept. You can restore it from the editor's **…** menu.
 
+## Keyboard shortcuts
+
+| Keys | Action |
+| --- | --- |
+| Ctrl+N | New entry |
+| Ctrl+F | Search entries |
+| Ctrl+Q | Open today's check-in |
+| Ctrl+S | Save now (it also saves on its own) |
+| Esc | Close search, or close the check-in window |
+
 ## Building and running
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).

@@ -9,7 +9,7 @@
                  Width="1000" Height="640" MinWidth="720" MinHeight="460"
                  WindowStartupLocation="CenterOwner">
   <Grid RowDefinitions="36,Auto,*">
-    <TextBlock Classes="app-title" Margin="16,0" Text="Trends" IsHitTestVisible="False" />
+    <TextBlock Classes="app-title titlebar" Text="Trends" IsHitTestVisible="False" />
 
     <Grid Grid.Row="1" Margin="24,8,24,16" ColumnDefinitions="*,Auto">
       <StackPanel Spacing="2">

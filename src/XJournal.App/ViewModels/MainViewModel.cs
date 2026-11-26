@@ -126,12 +126,13 @@ public sealed partial class MainViewModel : ViewModelBase
         SaveNow();
         var vm = new RevisionsViewModel(Journal.Entries.GetRevisions(Session.Current.Id));
         var view = new Views.RevisionsView { DataContext = vm };
-        if (!await _dialogs.ShowContentAsync("Previous versions", view, "Restore", "Cancel", vm.Validate)) return;
+        if (!await _dialogs.ShowContentAsync("Previous versions", view, "Restore", "Cancel", () => Task.FromResult(vm.Validate()))) return;
+        if (_closed) return;
         try
         {
             Session.RestoreRevision(vm.Selected!.Revision.Id);
         }
-        catch (JournalException ex)
+        catch (Exception ex) when (Errors.IsExpected(ex))
         {
             await _dialogs.ShowMessageAsync("Couldn't restore", ex.Message);
         }
@@ -168,8 +169,8 @@ public sealed partial class MainViewModel : ViewModelBase
     private void UpdateClock()
     {
         var now = Journal.Clock.LocalNow();
-        ClockTime = now.ToString("t");
-        ClockDate = now.ToString("dddd, MMMM d");
+        ClockTime = now.ToString("t", System.Globalization.CultureInfo.CurrentCulture);
+        ClockDate = now.ToString("dddd, MMMM d", System.Globalization.CultureInfo.CurrentCulture);
         UpdateEntryStamp();
     }
 
@@ -219,10 +220,17 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         if (!Session.Current.IsPersisted && Session.Current.IsEmpty) return;
         var ok = await _dialogs.ConfirmAsync("Delete this entry?",
-            "This entry will be permanently deleted. This can't be undone.", "Delete", destructive: true);
-        if (!ok) return;
+            "This entry will be permanently deleted. This can't be undone.", "Delete");
+        if (!ok || _closed) return;
         _autosave.Stop();
-        Session.DeleteCurrent();
+        try
+        {
+            Session.DeleteCurrent();
+        }
+        catch (Exception ex) when (Errors.IsExpected(ex))
+        {
+            await _dialogs.ShowMessageAsync("Couldn't delete the entry", ex.Message);
+        }
     }
 
     [ObservableProperty] public partial bool IsSearchOpen { get; set; }
@@ -347,6 +355,7 @@ public sealed partial class MainViewModel : ViewModelBase
         if (_closed) return null;
         _autosave.Stop();
         _clock.Stop();
+        Search.Stop();
         string? notice = null;
         try
         {

@@ -46,7 +46,7 @@ public sealed class UiTests : IDisposable
         window.CaptureRenderedFrame()?.Save(Path.Combine(folder, name + ".png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
     }
 
-    private (MainWindow Window, MainViewModel ViewModel) OpenMain(Journal journal)
+    private static (MainWindow Window, MainViewModel ViewModel) OpenMain(Journal journal)
     {
         var window = new MainWindow();
         var vm = new MainViewModel(journal, new WindowDialogs(window), window);
@@ -164,6 +164,21 @@ public sealed class UiTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void A_pending_search_after_signing_out_is_ignored()
+    {
+        var journal = _accounts.Create("caleb", Password);
+        var (window, vm) = OpenMain(journal);
+        vm.ToggleSearchCommand.Execute(null);
+        vm.Search.Query = "anything"; // schedules a search
+        vm.SignOutCommand.Execute(null);
+        Assert.True(journal.IsDisposed);
+        vm.Search.Run(); // would previously hit the closed database
+        vm.Search.Query = "more";
+        Pump();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void Questions_window_saves_answers_and_clears_the_reminder()
     {
         var journal = _accounts.Create("caleb", Password);
@@ -243,7 +258,7 @@ public sealed class UiTests : IDisposable
     }
 
     /// <summary>Shows a dialog's content in a plain window so it can be screenshotted.</summary>
-    private static Window Host(Control content, string title)
+    private static XJournal.App.Controls.JournalWindow Host(Control content, string title)
     {
         var window = new XJournal.App.Controls.JournalWindow { Width = 600, Height = 640 };
         window.Content = new Border
@@ -261,7 +276,7 @@ public sealed class UiTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void Merging_another_computers_journal_updates_the_open_entry()
+    public async Task Merging_another_computers_journal_updates_the_open_entry()
     {
         var home = _accounts.Create("caleb", Password);
         var session = new XJournal.Core.Sessions.EntrySession(home);
@@ -288,14 +303,14 @@ public sealed class UiTests : IDisposable
         }
 
         var merge = new MergeJournalViewModel(home, Path.Combine(_root, "laptop.xjbackup"));
-        Assert.False(merge.Validate());
+        Assert.False(await merge.ValidateAsync());
         merge.BackupPassword = "wrong password";
-        merge.UnlockCommand.Execute(null);
+        await merge.UnlockCommand.ExecuteAsync(null);
         Assert.NotNull(merge.Error);
         merge.BackupPassword = Password;
-        Assert.True(merge.Validate());
+        Assert.True(await merge.ValidateAsync());
         Assert.Contains("1 new entry", merge.PreviewLines);
-        Assert.Contains(merge.PreviewLines, l => l.StartsWith("1 entry updated"));
+        Assert.Contains(merge.PreviewLines, l => l.StartsWith("1 entry updated", StringComparison.Ordinal));
         var dialog = Host(new MergeJournalView { DataContext = merge }, "Merge in a journal");
         Screenshot(dialog, "13-merge");
         dialog.Close();

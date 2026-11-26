@@ -14,8 +14,6 @@ public sealed class AppShell(IClassicDesktopStyleApplicationLifetime desktop, Ac
 {
     private Window? _current;
 
-    public AccountStore Accounts => accounts;
-
     public void ShowLogin(string? notice = null)
     {
         ApplyTheme("system");

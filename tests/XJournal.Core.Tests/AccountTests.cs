@@ -47,3 +47,53 @@ public class AccountTests
         Assert.Contains("no account", ex.Message);
     }
 }
+
+public class AccountMaintenanceTests
+{
+    [Fact]
+    public void Stale_import_leftovers_are_cleaned_up_but_recent_ones_are_kept()
+    {
+        using var env = new TestEnv();
+        env.CreateJournal().Dispose();
+        var stale = Path.Combine(env.Accounts.UsersDirectory, ".import-old.tmp");
+        var recent = Path.Combine(env.Accounts.UsersDirectory, ".import-new.tmp");
+        File.WriteAllText(stale, "x");
+        File.WriteAllText(recent, "x");
+        File.SetLastWriteTimeUtc(stale, DateTime.UtcNow.AddDays(-2));
+
+        _ = new Accounts.AccountStore(env.Root, env.Clock);
+
+        Assert.False(File.Exists(stale));
+        Assert.True(File.Exists(recent)); // might belong to an import in progress
+        Assert.Equal(["caleb"], env.Accounts.ListAccounts());
+    }
+
+    [Fact]
+    public void Replacing_an_account_keeps_its_original_spelling()
+    {
+        using var env = new TestEnv();
+        string backup;
+        using (var source = env.CreateJournal("source"))
+        {
+            backup = env.TempFile("b.xjbackup");
+            Backup.JournalTransfer.ExportEncrypted(source, backup);
+        }
+        env.CreateJournal("Caleb").Dispose();
+
+        using var imported = new Backup.JournalTransfer(env.Accounts)
+            .ImportBackup(backup, TestEnv.Password, "caleb", null, replaceExisting: true);
+
+        Assert.Equal("Caleb", imported.Username);
+        Assert.Equal(["Caleb", "source"], env.Accounts.ListAccounts());
+    }
+
+    [Fact]
+    public void Disposing_a_journal_marks_it_closed()
+    {
+        using var env = new TestEnv();
+        var journal = env.CreateJournal();
+        Assert.False(journal.IsDisposed);
+        journal.Dispose();
+        Assert.True(journal.IsDisposed);
+    }
+}

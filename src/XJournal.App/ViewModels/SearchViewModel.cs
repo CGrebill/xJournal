@@ -41,8 +41,18 @@ public sealed partial class SearchViewModel : ViewModelBase
     partial void OnFromDateChanged(DateTime? value) => Schedule();
     partial void OnToDateChanged(DateTime? value) => Schedule();
 
+    /// <summary>Cancels any pending search (called when the journal closes).</summary>
+    public void Stop()
+    {
+        _debounce.Stop();
+        _stopped = true;
+    }
+
+    private bool _stopped;
+
     private void Schedule()
     {
+        if (_stopped) return;
         _debounce.Stop();
         _debounce.Start();
     }
@@ -70,6 +80,7 @@ public sealed partial class SearchViewModel : ViewModelBase
 
     public void Run()
     {
+        if (_stopped) return;
         var from = FromDate is { } f ? DateOnly.FromDateTime(f) : (DateOnly?)null;
         var to = ToDate is { } t ? DateOnly.FromDateTime(t) : (DateOnly?)null;
         if (from > to) (from, to) = (to, from);
@@ -82,8 +93,8 @@ public sealed partial class SearchViewModel : ViewModelBase
             var e = r.Entry;
             Results.Add(new SearchResultItem(
                 e.Id,
-                e.CreatedAt.ToString("ddd, MMM d, yyyy"),
-                e.CreatedAt.ToString("t"),
+                e.CreatedAt.ToString("ddd, MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture),
+                e.CreatedAt.ToString("t", System.Globalization.CultureInfo.CurrentCulture),
                 e.Summary.Trim(),
                 r.Snippet,
                 e.Id == current));

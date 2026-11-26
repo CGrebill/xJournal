@@ -16,7 +16,7 @@
   </Window.KeyBindings>
 
   <Grid RowDefinitions="36,*">
-    <StackPanel Orientation="Horizontal" Margin="16,0" Spacing="6" IsHitTestVisible="False">
+    <StackPanel Classes="titlebar" Orientation="Horizontal" Spacing="6" IsHitTestVisible="False">
       <TextBlock Classes="app-title" Text="xJournal" FontWeight="SemiBold" />
       <TextBlock Classes="app-title" Text="·" />
       <TextBlock Classes="app-title" Text="{Binding Username}" />
@@ -63,7 +63,7 @@
       <Grid Grid.Row="2" RowDefinitions="Auto,*">
         <fa:FAInfoBar Severity="Informational" Margin="0,0,0,12"
                       Title="Today's check-in" Message="You haven't answered today's questions yet."
-                      IsOpen="{Binding ShowReminder}" IsClosable="True"
+                      IsOpen="{Binding ShowReminder, Mode=OneWay}" IsClosable="True"
                       CloseButtonCommand="{Binding DismissReminderCommand}">
           <fa:FAInfoBar.ActionButton>
             <Button Content="Answer now" Command="{Binding OpenQuestionsCommand}" />

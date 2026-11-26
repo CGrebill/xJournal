@@ -61,14 +61,14 @@ public sealed class JournalDatabase : IDisposable
     /// <exception cref="InvalidPasswordException">Wrong password, or not an encrypted SQLite file.</exception>
     /// <exception cref="NotAJournalException">Decrypted, but not an xJournal file.</exception>
     /// <exception cref="NewerVersionException">Written by a newer xJournal.</exception>
-    public static JournalDatabase Open(string path, string password, bool migrate = true)
+    public static JournalDatabase Open(string path, string password)
     {
         if (!File.Exists(path)) throw new FileNotFoundException("Journal file not found.", path);
         var connection = OpenKeyed(path, password, SqliteOpenMode.ReadWrite);
         try
         {
             Verify(connection);
-            if (migrate) Schema.Migrate(connection);
+            Schema.Migrate(connection);
             return new JournalDatabase(connection, path);
         }
         catch
@@ -88,6 +88,10 @@ public sealed class JournalDatabase : IDisposable
             return true;
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 26) // SQLITE_NOTADB
+        {
+            return false;
+        }
+        catch (InvalidPasswordException)
         {
             return false;
         }
@@ -125,7 +129,6 @@ public sealed class JournalDatabase : IDisposable
                 using var destination = OpenKeyed(temp, password, SqliteOpenMode.ReadWriteCreate);
                 Connection.BackupDatabase(destination);
             }
-            SqliteConnection.ClearAllPools();
             File.Move(temp, fullPath, overwrite: true);
         }
         finally

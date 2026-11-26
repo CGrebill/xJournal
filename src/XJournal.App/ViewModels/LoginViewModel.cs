@@ -99,7 +99,7 @@ public sealed partial class LoginViewModel : ViewModelBase
 
         var import = new ImportJournalViewModel(_accounts, path, Username);
         var view = new Views.ImportJournalView { DataContext = import };
-        var accepted = await _dialogs.ShowContentAsync("Import journal", view, "Import", "Cancel", canClose: import.Validate);
+        var accepted = await _dialogs.ShowContentAsync("Import journal", view, "Import", "Cancel", canClose: import.ValidateAsync);
         if (!accepted) return;
 
         IsBusy = true;
@@ -112,7 +112,7 @@ public sealed partial class LoginViewModel : ViewModelBase
         {
             Error = ex.Message;
         }
-        catch (IOException ex)
+        catch (Exception ex) when (Errors.IsExpected(ex))
         {
             Error = "The import failed: " + ex.Message;
         }

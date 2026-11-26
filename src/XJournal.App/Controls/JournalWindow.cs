@@ -25,6 +25,7 @@ public class JournalWindow : Window
         ExtendClientAreaToDecorationsHint = true;
         ExtendClientAreaTitleBarHeightHint = TitleBarHeight;
         Classes.Add("journal");
+        if (OperatingSystem.IsMacOS()) Classes.Add("macos");
         Icon = AppIcon.Value;
     }
 

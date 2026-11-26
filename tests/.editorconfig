@@ -1,0 +1,4 @@
+# Test projects
+[*.cs]
+# Test names read as sentences: Merging_the_same_file_twice_is_harmless.
+dotnet_diagnostic.CA1707.severity = none
